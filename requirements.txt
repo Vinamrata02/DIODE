@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+torch
+jupyter
+nbformat
+scikit-learn
+scipy
+pyyaml
+tqdm
+networkx

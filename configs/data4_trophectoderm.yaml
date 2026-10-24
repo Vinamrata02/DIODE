@@ -1,0 +1,106 @@
+dataset: data4_trophectoderm
+data_dir: data/data4_trophectoderm
+reference_network_dir: data/data4_trophectoderm
+output_dir: outputs/data4_trophectoderm
+expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
+baseline_expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_raw_100.txt
+pseudotime: data/data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
+genes: data/data4_trophectoderm/trophectoderm_gene_names_100.txt
+seed: 0
+device: auto
+compute_perturbation_scores: true
+cv:
+  n_splits: 5
+  n_bins: 8
+  seed: 0
+training:
+  loss_type: huber
+  huber_delta: 0.9
+  l1_lambda: 0.0
+  l2_lambda: 0.00001
+  lr: 1.0
+  epochs: 1001
+  print_every: 500
+  lbfgs_max_iter: 20
+  lbfgs_history_size: 10
+  lbfgs_line_search_fn: strong_wolfe
+  optimizer_tolerance_grad: 0.001
+  stop_tolerance_grad: 0.001
+  stop_tolerance_change: 0.0001
+  stop_on_loss: true
+  stop_on_parameter: true
+  stop_on_optimizer_step_size: false
+  stop_on_grad: false
+  patience_level: 5
+  dtype: float64
+  a_nnz_threshold: 0.000001
+hyperparameter_grid:
+  huber_delta: [0.9]
+  l2_lambda: [0.00001]
+  tolerance_change: [0.0001]
+
+solvers:
+  phoenix:
+    phoenix_root: external/PHOENIX
+    # Match the PHOENIX notebooks: smoothed expression, no prior network.
+    expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
+    time_policy: rank_if_tied
+    model_params:
+      method: dopri5
+      neurons_per_layer: 200
+      optimizer: adam
+      batch_size: 100
+      init_lr: 0.0001
+      weight_decay: 0.0
+      val_split: 0.20
+      noise: 0.0
+      epochs: 100
+      normalize_data: false
+      scale_expression: 1.0
+  scode:
+    scode_r_path: external/SCODE/SCODE.R
+    rscript_bin: Rscript
+    num_trials: 4
+    model_params:
+      d: 4
+      num_iterations: 2000
+  grisli:
+    grisli_root: external/GRISLI
+    R: 100
+    alpha_min: 0.3
+  genie3:
+    genie3_dir: external/GENIE3/GENIE3_python
+    ntrees: 1000
+    nthreads: 1
+  dyn_genie3:
+    dyn_genie3_dir: external/dynGENIE3/dynGENIE3_python
+    ntrees: 1000
+    nthreads: 1
+  prob:
+    prob_dir: external/PROB/Executable functions
+    average_tied_times: true
+  swing:
+    swing_dir: external/SWING
+    min_lag: 1
+    max_lag: 3
+    window_width: 10
+    n_trees: 100
+    n_jobs: -1
+  lm:
+    runner_path: external/LR/lm.R
+    rscript_bin: Rscript
+  lasso:
+    runner_path: external/Lasso/lasso.R
+    rscript_bin: Rscript
+  mi:
+    runner_path: external/MI/run_mi_ida.R
+    rscript_bin: Rscript
+    alpha: 0.01
+  ida_min:
+    runner_path: external/IDA/run_mi_ida.R
+    rscript_bin: Rscript
+    alpha: 0.01
+  ida_mean:
+    runner_path: external/IDA/run_mi_ida.R
+    rscript_bin: Rscript
+    alpha: 0.01

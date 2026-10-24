@@ -1,0 +1,17 @@
+name: exact-linear-ode
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - scipy
+  - scikit-learn
+  - networkx
+  - pyyaml
+  - tqdm
+  - jupyter
+  - pip:
+      - torch
