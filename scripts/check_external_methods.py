@@ -128,7 +128,7 @@ def method_rows():
     rscript = command_exists("Rscript")
     rscript_check = (bool(rscript), f"Rscript found at {rscript}" if rscript else "Rscript is not on PATH")
 
-    rows.append(("ours", "ok", "built-in ExactLinearODE method; no external method dependency"))
+    rows.append(("DIODE", "ok", "built-in DIODE method; no external method dependency"))
 
     phoenix_code = external / "PHOENIX" / "ode_net" / "code"
     rows.append((
@@ -156,6 +156,14 @@ def method_rows():
         *combine_checks([
             check_paths(external / "GENIE3" / "GENIE3_python" / "GENIE3.py"),
             check_python_packages("numpy", "pandas", "sklearn"),
+        ]),
+    ))
+
+    rows.append((
+        "grnboost2",
+        *combine_checks([
+            check_paths(external / "GRNBoost2" / "run_grnboost2.py"),
+            check_python_packages("arboreto.core", "dask.dataframe", "distributed"),
         ]),
     ))
 

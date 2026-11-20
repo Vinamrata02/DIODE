@@ -11,9 +11,9 @@ import numpy as np
 import torch
 import yaml
 
-from exact_linear_ode import ExactLinearODEBenchmark
-from exact_linear_ode.solvers._phoenix_worker import extract_phoenix_scores
-from exact_linear_ode.solvers.phoenix import run_phoenix_from_numpy
+from diode import DIODEBenchmark
+from diode.solvers._phoenix_worker import extract_phoenix_scores
+from diode.solvers.phoenix import run_phoenix_from_numpy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -38,9 +38,9 @@ class PhoenixTests(unittest.TestCase):
         np.testing.assert_array_equal(expected, [[22., 28.], [0., 0.]])
 
     def test_all_five_configs_use_notebook_expression_and_defaults(self):
-        benchmark = ExactLinearODEBenchmark(repo_root=REPO_ROOT)
+        benchmark = DIODEBenchmark(repo_root=REPO_ROOT)
         self.assertEqual(benchmark._resolve_solvers("PHOENIX"), ["phoenix"])
-        self.assertIn("phoenix", benchmark.solvers)
+        self.assertIn("PHOENIX", benchmark.solvers)
         paths = list((REPO_ROOT / "configs").glob("*.yaml"))
         self.assertEqual(len(paths), 5)
         for path in paths:
@@ -83,8 +83,8 @@ class PhoenixTests(unittest.TestCase):
                 "solvers": {"phoenix": {"expression": "smooth.txt", "model_params": {"epochs": 1}}},
             }
             (root / "configs/tiny.yaml").write_text(yaml.safe_dump(config))
-            with patch("exact_linear_ode.solvers.phoenix.run_phoenix_from_numpy", return_value=(A, None)) as run:
-                result = ExactLinearODEBenchmark(repo_root=root).run(
+            with patch("diode.solvers.phoenix.run_phoenix_from_numpy", return_value=(A, None)) as run:
+                result = DIODEBenchmark(repo_root=root).run(
                     solvers=["phoenix"], skip_unavailable=False, progress=False,
                 )
             np.testing.assert_array_equal(run.call_args.args[0], expression[:, ::-1])

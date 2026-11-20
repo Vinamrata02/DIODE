@@ -9,3 +9,7 @@ scipy
 pyyaml
 tqdm
 networkx
+# GRNBoost2
+arboreto==0.1.6
+dask[dataframe]>=2024.1.0
+distributed>=2024.1.0

@@ -1,12 +1,12 @@
-# ExactLinearODE
+# DIODE
 
-This repository contains code, data, notebooks, and reference networks for reproducing the Exact Linear ODE experiments.
+This repository contains code, data, notebooks, and reference networks for reproducing the DIODE experiments.
 
 ## Repository Layout
 
 ```text
-ExactLinearODE/
-├── src/exact_linear_ode/ # Installable package code
+DIODE/
+├── src/diode/ # Installable package code
 ├── data/                 # Dataset inputs and reference networks
 ├── notebooks/            # Clean reproduction notebooks
 └── configs/              # Dataset run settings
@@ -18,11 +18,11 @@ Create the Conda environment, activate it, and install this repository in editab
 
 ```bash
 conda env create -f environment.yml
-conda activate exact-linear-ode
+conda activate diode
 pip install -e .
 ```
 
-After installation, the package can be imported as `exact_linear_ode` and the command-line runners `exact-linear-ode-run` and `exact-linear-ode-run-all` are available.
+After installation, the package can be imported as `diode` and the command-line runners `diode-run` and `diode-run-all` are available.
 
 The notebooks assume this editable install step has been completed.
 
@@ -32,7 +32,7 @@ The notebooks assume this editable install step has been completed.
 
 ```bash
 conda env create -f environment.yml
-conda activate exact-linear-ode
+conda activate diode
 pip install -e .
 ```
 
@@ -83,7 +83,7 @@ python scripts/check_external_methods.py
 
 ## Optional External Methods
 
-The ExactLinearODE model runs from this repository. External comparison methods
+The DIODE model runs from this repository. External comparison methods
 used for reproduction are distributed under `external/` at the versions used by
 the benchmark. The setup script can also refresh or restore those folders if
 they are missing.
@@ -115,9 +115,9 @@ interpreter). The preflight helper checks the vendored runtime as well.
 Run PHOENIX through the same benchmark interface:
 
 ```python
-from exact_linear_ode import ExactLinearODEBenchmark
+from diode import DIODEBenchmark
 
-results = ExactLinearODEBenchmark(dataset="data2").run(solvers=["phoenix"])
+results = DIODEBenchmark(dataset="data2").run(solvers=["phoenix"])
 ```
 
 All five dataset configs reproduce the PHOENIX notebooks' no-prior workflow:
@@ -129,7 +129,8 @@ network is passed into PHOENIX training. Reference networks are used only by
 the benchmark evaluation.
 
 Each `solvers.phoenix.expression` selects the smoothed input independently of
-the raw `baseline_expression` used by other methods. Cells are stably sorted
+the dataset-specific `baseline_expression` used by other methods. Data1 uses
+smoothed baseline input; the other dataset configs retain raw baseline input. Cells are stably sorted
 by pseudotime. Ties use evenly spaced rank time spanning the observed time
 range (integer ranks if all times are equal), matching the original notebooks.
 Set `time_policy: error` to reject tied times instead. The adapter records the
@@ -139,7 +140,7 @@ ordering in the output folder.
 The low-level wrapper follows the SCODE calling convention:
 
 ```python
-from exact_linear_ode.solvers.phoenix import run_phoenix_from_numpy
+from diode.solvers.phoenix import run_phoenix_from_numpy
 
 A, process = run_phoenix_from_numpy(
     X_genes_by_cells, pseudotime, "outputs/my_dataset/phoenix",
@@ -220,14 +221,15 @@ also set `expression` to override the shared `baseline_expression`.
 
 ## Notebooks
 
-- `Reproduce Fig.2e.ipynb`
+- `Reproduce figures/Reproduce Fig.2d.ipynb`
+- `Reproduce figures/Reproduce Fig.2e.ipynb`
 - `notebooks/01_data1.ipynb`
 - `notebooks/02_data2.ipynb`
 - `notebooks/03_data3.ipynb`
 - `notebooks/04_data4_epiblast.ipynb`
 - `notebooks/05_data4_trophectoderm.ipynb`
 
-`Reproduce Fig.2e.ipynb` demonstrates the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. It can be used to run the benchmark on one selected dataset or on multiple configured datasets. The numbered notebooks provide dataset-specific reproductions with the same installed package interface.
+`Reproduce figures/Reproduce Fig.2d.ipynb` (data1, Mouse MEF-PrE) and `Reproduce figures/Reproduce Fig.2e.ipynb` (data3) demonstrate the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. They can be used to run the benchmark on one selected dataset or on multiple configured datasets. The numbered notebooks provide dataset-specific reproductions with the same installed package interface.
 
 ## Reference Networks
 
@@ -236,7 +238,7 @@ Reference networks live inside each `data/<dataset>/` folder. Every dataset has 
 ## Run A Dataset
 
 ```bash
-exact-linear-ode-run configs/data1.yaml
+diode-run configs/data1.yaml
 ```
 
 `run_dataset.py` mirrors the notebook workflow: it evaluates the configured hyperparameter grid across pseudotime-stratified CV folds, selects the best setting, refits that setting on the full ordered dataset, and reports AUROC/AUPR/signed-direction metrics from the final refit. The CV logs and selected hyperparameters are saved next to the final outputs.
@@ -245,13 +247,13 @@ Full runs can be expensive. For quick checks, lower `training.epochs`, `training
 
 ## Run Your Own Dataset
 
-To run ExactLinearODE on a new dataset, add one folder under `data/` and one matching YAML file under `configs/`. The benchmark interface discovers datasets from `configs/*.yaml`, so a new config with `dataset: my_dataset` will appear in:
+To run DIODE on a new dataset, add one folder under `data/` and one matching YAML file under `configs/`. The benchmark interface discovers datasets from `configs/*.yaml`, so a new config with `dataset: my_dataset` will appear in:
 
 ```python
-from exact_linear_ode import ExactLinearODEBenchmark
+from diode import DIODEBenchmark
 
-ExactLinearODEBenchmark.datasets
-ExactLinearODEBenchmark.solvers
+DIODEBenchmark.datasets
+DIODEBenchmark.solvers
 ```
 
 Recommended folder layout:
@@ -318,15 +320,15 @@ hyperparameter_grid:
 Then run:
 
 ```bash
-exact-linear-ode-run configs/my_dataset.yaml
+diode-run configs/my_dataset.yaml
 ```
 
 or from Python:
 
 ```python
-from exact_linear_ode import ExactLinearODEBenchmark
+from diode import DIODEBenchmark
 
-benchmark = ExactLinearODEBenchmark(dataset="my_dataset")
+benchmark = DIODEBenchmark(dataset="my_dataset")
 results = benchmark.run()
 results
 ```
@@ -336,18 +338,18 @@ The runner sorts cells by pseudotime, performs the configured hyperparameter-sel
 ## Python Interface
 
 ```python
-from exact_linear_ode import ExactLinearODEBenchmark
+from diode import DIODEBenchmark
 
-ExactLinearODEBenchmark.datasets
-ExactLinearODEBenchmark.solvers
+DIODEBenchmark.datasets
+DIODEBenchmark.solvers
 
-demo = ExactLinearODEBenchmark(dataset="data1")
+demo = DIODEBenchmark(dataset="data1")
 results = demo.run()
 results
 ```
 
-Use `demo.run(solvers=["ours"])` to run only the ExactLinearODE solver.
-External solver wrappers are exposed in `ExactLinearODEBenchmark.solvers`; if a
+Use `demo.run(solvers=["DIODE"])` to run only the DIODE solver.
+External solver wrappers are exposed in `DIODEBenchmark.solvers`; if a
 solver needs an unconfigured script, package, or precomputed score matrix, the
 notebook interface reports it with `status == "not_available"` instead of
 stopping the full run.
@@ -355,3 +357,7 @@ stopping the full run.
 ## CPU/GPU
 
 Configs use `device: auto` by default. The runner uses CUDA when `torch.cuda.is_available()` is true and otherwise falls back to CPU. Set `device: cpu` to force CPU, or `device: cuda` to require CUDA.
+
+### Compatibility
+
+The primary Python interface is `from diode import DIODE, DIODEBenchmark`. Existing `exact_linear_ode` imports and the old class names remain compatibility aliases. Reinstall the package with `python -m pip install -e . --no-deps --no-build-isolation` in your existing environment after updating this checkout. Saved notebook outputs are retained as historical run records.

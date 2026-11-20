@@ -1,27 +1,15 @@
-"""Public interface for the ExactLinearODE package."""
+"""Compatibility imports for the renamed DIODE package."""
 
-from exact_linear_ode.experiment import ExactLinearODEBenchmark
-from exact_linear_ode.exact_linear_ode import ExactLinearODE
-from exact_linear_ode.solvers.ours_lbfgs import LTIExact_Steady
+import sys
 
+import diode as _diode
+import diode.experiment as _experiment
+from diode import DIODE, DIODEBenchmark, LTIExact_Steady, run_all, run_dataset
 
-def run_dataset(*args, **kwargs):
-    """Run one dataset config."""
-    from exact_linear_ode.runners.run_dataset import run_dataset as _run_dataset
+__path__ = _diode.__path__
+sys.modules[__name__ + ".experiment"] = _experiment
+ExactLinearODE = DIODE
+ExactLinearODEBenchmark = DIODEBenchmark
 
-    return _run_dataset(*args, **kwargs)
-
-
-def run_all(*args, **kwargs):
-    """Run all selected dataset configs."""
-    from exact_linear_ode.runners.run_all import run_all as _run_all
-
-    return _run_all(*args, **kwargs)
-
-__all__ = [
-    "ExactLinearODEBenchmark",
-    "ExactLinearODE",
-    "LTIExact_Steady",
-    "run_all",
-    "run_dataset",
-]
+__all__ = ["DIODE", "DIODEBenchmark", "ExactLinearODE", "ExactLinearODEBenchmark",
+           "LTIExact_Steady", "run_all", "run_dataset"]

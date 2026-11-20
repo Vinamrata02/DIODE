@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "exact-linear-ode"
+name = "diode"
 version = "0.1.0"
-description = "Exact Linear ODE solvers and benchmark runners for gene regulatory network recovery."
+description = "DIODE solvers and benchmark runners for gene regulatory network recovery."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -21,6 +21,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+grnboost2 = [
+    "arboreto==0.1.6",
+    "dask[dataframe]>=2024.1.0",
+    "distributed>=2024.1.0",
+]
 matlab = [
     "matlabengine",
 ]
@@ -29,5 +34,5 @@ matlab = [
 where = ["src"]
 
 [project.scripts]
-exact-linear-ode-run = "exact_linear_ode.runners.run_dataset:main"
-exact-linear-ode-run-all = "exact_linear_ode.runners.run_all:main"
+diode-run = "diode.runners.run_dataset:main"
+diode-run-all = "diode.runners.run_all:main"

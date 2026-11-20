@@ -14,8 +14,8 @@ grisli_compile_spams="${GRISLI_COMPILE_SPAMS:-auto}"
 phoenix_repo_url="${PHOENIX_REPO_URL:-https://github.com/QuackenbushLab/phoenix.git}"
 phoenix_ref="${PHOENIX_REF:-b18317663aada933fa26402df6aad86d042bd13b}"
 phoenix_dir="${external_dir}/PHOENIX"
-install_r_deps="${EXACT_LINEAR_ODE_INSTALL_R_DEPS:-1}"
-refresh_external="${EXACT_LINEAR_ODE_REFRESH_EXTERNAL:-0}"
+install_r_deps="${DIODE_INSTALL_R_DEPS:-1}"
+refresh_external="${DIODE_REFRESH_EXTERNAL:-0}"
 
 warn() {
   printf 'WARNING: %s\n' "$*" >&2
@@ -23,7 +23,7 @@ warn() {
 
 install_r_dependencies() {
   if [[ "${install_r_deps}" == "0" ]]; then
-    printf 'Skipping R dependency installation because EXACT_LINEAR_ODE_INSTALL_R_DEPS=0.\n'
+    printf 'Skipping R dependency installation because DIODE_INSTALL_R_DEPS=0.\n'
     return 0
   fi
 
@@ -63,7 +63,7 @@ ensure_external_repo() {
   fi
 
   if [[ -d "${dir}/.git" ]]; then
-    printf 'Refreshing %s at %s because EXACT_LINEAR_ODE_REFRESH_EXTERNAL=1 or required files are missing.\n' "${label}" "${dir}"
+    printf 'Refreshing %s at %s because DIODE_REFRESH_EXTERNAL=1 or required files are missing.\n' "${label}" "${dir}"
     git -C "${dir}" fetch --all --tags
     git -C "${dir}" checkout "${ref}"
     return 0
@@ -85,6 +85,15 @@ install_r_dependencies
 ensure_external_repo "SCODE" "${scode_dir}" "${scode_repo_url}" "${scode_ref}" "${scode_dir}/SCODE.R"
 ensure_external_repo "GRISLI" "${grisli_dir}" "${grisli_repo_url}" "${grisli_ref}" "${grisli_dir}/GRISILI.m"
 ensure_external_repo "PHOENIX" "${phoenix_dir}" "${phoenix_repo_url}" "${phoenix_ref}" "${phoenix_dir}/ode_net/code/odenet.py"
+
+# GRNBoost2 is packaged by Arboreto, so no separate git checkout is needed.
+grnboost2_python="${GRNBOOST2_PYTHON:-python}"
+if [[ "${DIODE_INSTALL_GRNBOOST2:-0}" == "1" ]]; then
+  "${grnboost2_python}" -m pip install -r "${external_dir}/GRNBoost2/requirements.txt"
+fi
+if ! "${grnboost2_python}" -c "import arboreto.core, dask.dataframe, distributed" >/dev/null 2>&1; then
+  warn "GRNBoost2 dependencies are missing. Run python -m pip install -e '.[grnboost2]' from the repository root, or rerun setup with DIODE_INSTALL_GRNBOOST2=1. GRNBOOST2_PYTHON selects the interpreter."
+fi
 
 # PHOENIX's integrator is bundled upstream; its remaining Python dependencies
 # (NumPy, PyTorch, Matplotlib) are installed by pip install -e . / environment.yml.

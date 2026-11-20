@@ -64,6 +64,11 @@ solvers:
     grisli_root: external/GRISLI
     R: 100
     alpha_min: 0.3
+  grnboost2:
+    # Arboreto defaults; all genes are candidate regulators, matching the notebook.
+    seed: 20
+    n_workers: 1
+    threads_per_worker: 1
   genie3:
     genie3_dir: external/GENIE3/GENIE3_python
     ntrees: 1000
