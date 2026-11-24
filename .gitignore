@@ -23,3 +23,5 @@ example_data/
 # Local source checkouts for imputation baselines
 /external/scNODE
 /external/MIOFlow
+
+/tests/
