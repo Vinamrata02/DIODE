@@ -12,8 +12,7 @@ import torch
 import yaml
 
 from diode import DIODEBenchmark
-from diode.solvers._phoenix_worker import extract_phoenix_scores
-from diode.solvers.phoenix import predict_phoenix_trajectory, run_phoenix_from_numpy
+from diode.solvers.phoenix import extract_phoenix_scores, predict_phoenix_trajectory, run_phoenix_from_numpy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

@@ -1,12 +1,18 @@
 """scNODE wrapper using the notebook's pseudotime bins and cell assignment."""
 
+import sys
+
 import numpy as np
 
-from diode.solvers._imputation_worker import pseudotime_bin_rows, run_worker
+from diode.utils.imputation_runtime import (
+    pseudotime_bin_rows,
+    run_imputation_entry_point,
+    run_imputation_subprocess,
+)
 
 
 def run_scnode_from_numpy(expression, pseudotime, source_root):
-    return run_worker("scNODE", expression, pseudotime, source_root, "optim/running.py")
+    return run_imputation_subprocess(__name__, "scNODE", expression, pseudotime, source_root, "optim/running.py")
 
 
 def _fit_scnode(expression, pseudotime):
@@ -34,3 +40,7 @@ def _fit_scnode(expression, pseudotime):
     for bin_index, indices in enumerate(rows):
         reconstructed[indices] = predictions[:len(indices), bin_index]
     return reconstructed
+
+
+if __name__ == "__main__":
+    run_imputation_entry_point(_fit_scnode, sys.argv[1])

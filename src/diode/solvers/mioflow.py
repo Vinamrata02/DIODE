@@ -1,12 +1,18 @@
 """MIOFlow wrapper using the notebook's PCA and pseudotime bin assignment."""
 
+import sys
+
 import numpy as np
 
-from diode.solvers._imputation_worker import pseudotime_bin_rows, run_worker
+from diode.utils.imputation_runtime import (
+    pseudotime_bin_rows,
+    run_imputation_entry_point,
+    run_imputation_subprocess,
+)
 
 
 def run_mioflow_from_numpy(expression, pseudotime, source_root):
-    return run_worker("MIOFlow", expression, pseudotime, source_root, "mioflow/mioflow.py")
+    return run_imputation_subprocess(__name__, "MIOFlow", expression, pseudotime, source_root, "mioflow/mioflow.py")
 
 
 def _fit_mioflow(expression, pseudotime):
@@ -41,3 +47,7 @@ def _fit_mioflow(expression, pseudotime):
     for bin_index, indices in enumerate(rows):
         reconstructed[indices] = trajectories[bin_index, :len(indices)]
     return reconstructed
+
+
+if __name__ == "__main__":
+    run_imputation_entry_point(_fit_mioflow, sys.argv[1])
