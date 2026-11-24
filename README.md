@@ -222,19 +222,19 @@ also set `expression` to override the shared `baseline_expression`.
 
 ## Notebooks
 
-- `Reproduce figures/Reproduce Fig.2d.ipynb`
-- `Reproduce figures/Reproduce Fig.2e.ipynb`
+- `Reproduce_figures/Reproduce Fig.2d.ipynb`
+- `Reproduce_figures/Reproduce Fig.2e.ipynb`
 - `Example/data1_mouse_esc_pre.ipynb`
 - `Example/data2_mouse_mef_in.ipynb`
 - `Example/data3_human_esc_de.ipynb`
 - `Example/04_data4_epiblast.ipynb`
 - `Example/05_data4_trophectoderm.ipynb`
 
-`Reproduce figures/Reproduce Fig.2d.ipynb` (data1, Mouse MEF-PrE) and `Reproduce figures/Reproduce Fig.2e.ipynb` (data3) demonstrate the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. They can be used to run the benchmark on one selected dataset or on multiple configured datasets. The example notebooks provide dataset-specific reproductions with the same installed package interface.
+`Reproduce_figures/Reproduce Fig.2d.ipynb` (data1, Mouse MEF-PrE) and `Reproduce_figures/Reproduce Fig.2e.ipynb` (data3) demonstrate the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. They can be used to run the benchmark on one selected dataset or on multiple configured datasets. The example notebooks provide dataset-specific reproductions with the same installed package interface.
 
 ## Masked-entry imputation
 
-`Reproduce figures/Reproduce Fig.5e.ipynb` and `Reproduce figures/Reproduce Fig.5f.ipynb`
+`Reproduce_figures/Reproduce Fig.5e.ipynb` and `Reproduce_figures/Reproduce Fig.5f.ipynb`
 run the five configured datasets with 2% and 5% masking, respectively. Each
 notebook displays mean and sample standard deviation of RMSE across five masks
 shared by DIODE, scNODE, MIOFlow, MAGIC, and ALRA.
@@ -274,7 +274,7 @@ notebooks require all five methods.
 
 ## Unmasked trajectory scores
 
-`Reproduce figures/Reproduce Fig.7.ipynb` uses `.run(task="imputation")`
+`Reproduce_figures/Reproduce Fig.7.ipynb` uses `.run(task="imputation")`
 with the masking fraction omitted. Explicit `masking=0.0` selects the
 same workflow. Each method runs once. DIODE returns the fitted trajectory
 from the full smooth expression matrix. The baselines use the raw
@@ -422,4 +422,4 @@ Configs use `device: auto` by default. The runner uses CUDA when `torch.cuda.is_
 
 ### Compatibility
 
-The primary Python interface is `from diode import DIODE, DIODEBenchmark`. Existing `exact_linear_ode` imports and the old class names remain compatibility aliases. Reinstall the package with `python -m pip install -e . --no-deps --no-build-isolation` in your existing environment after updating this checkout. Saved notebook outputs are retained as historical run records.
+The primary Python interface is `from diode import DIODE, DIODEBenchmark`. Reinstall the package with `python -m pip install -e . --no-deps --no-build-isolation` in your existing environment after updating this checkout. Saved notebook outputs are retained as historical run records.
