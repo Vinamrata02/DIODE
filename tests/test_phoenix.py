@@ -13,7 +13,7 @@ import yaml
 
 from diode import DIODEBenchmark
 from diode.solvers._phoenix_worker import extract_phoenix_scores
-from diode.solvers.phoenix import run_phoenix_from_numpy
+from diode.solvers.phoenix import predict_phoenix_trajectory, run_phoenix_from_numpy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +41,7 @@ class PhoenixTests(unittest.TestCase):
         benchmark = DIODEBenchmark(repo_root=REPO_ROOT)
         self.assertEqual(benchmark._resolve_solvers("PHOENIX"), ["phoenix"])
         self.assertIn("PHOENIX", benchmark.solvers)
-        paths = list((REPO_ROOT / "configs").glob("*.yaml"))
+        paths = [benchmark.config_path(dataset) for dataset in benchmark.datasets]
         self.assertEqual(len(paths), 5)
         for path in paths:
             config = yaml.safe_load(path.read_text())
@@ -79,8 +79,11 @@ class PhoenixTests(unittest.TestCase):
             config = {
                 "dataset": "tiny", "expression": "unused.txt", "baseline_expression": "unused_raw.txt",
                 "pseudotime": "time.txt", "genes": "genes.txt", "reference_network_dir": ".",
-                "output_dir": "outputs/tiny", "seed": 17, "device": "cpu",
-                "solvers": {"phoenix": {"expression": "smooth.txt", "model_params": {"epochs": 1}}},
+                "output_dir": "outputs/tiny",
+                "solvers": {"phoenix": {
+                    "expression": "smooth.txt", "seed": 17, "device": "cpu",
+                    "model_params": {"epochs": 1},
+                }},
             }
             (root / "configs/tiny.yaml").write_text(yaml.safe_dump(config))
             with patch("diode.solvers.phoenix.run_phoenix_from_numpy", return_value=(A, None)) as run:
@@ -101,7 +104,8 @@ class PhoenixTests(unittest.TestCase):
             X = np.array([[.8, 1., .9, .7], [.6, .5, .55, .65], [.6, .8, .7, .5]])
             A, process = run_phoenix_from_numpy(
                 X, [.5, 0., 0., 1.], directory, device="cpu", seed=17,
-                model_params={"epochs": 2, "neurons_per_layer": 10, "batch_size": 3},
+                model_params={"epochs": 2, "neurons_per_layer": 10, "batch_size": 3,
+                              "scale_expression": 2.0, "normalize_data": True},
             )
             self.assertEqual(process.returncode, 0)
             self.assertEqual(A.shape, (3, 3))
@@ -116,6 +120,12 @@ class PhoenixTests(unittest.TestCase):
             self.assertFalse(metadata["prior_used"])
             self.assertIn(metadata["best_epoch"], [1, 2])
             self.assertEqual(np.loadtxt(output / "history.csv", delimiter=",", skiprows=1).shape, (2, 2))
+            fitted = predict_phoenix_trajectory(
+                output, REPO_ROOT / "external/PHOENIX", np.array([0.0, 0.0, 0.5, 1.0]), X[:, 1],
+            )
+            self.assertEqual(fitted.shape, X.T.shape)
+            self.assertTrue(np.isfinite(fitted).all())
+            np.testing.assert_allclose(fitted[0], X[:, 1])
 
 
 if __name__ == "__main__":

@@ -6,40 +6,44 @@ expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized
 baseline_expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_raw_100.txt
 pseudotime: data/data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
 genes: data/data4_trophectoderm/trophectoderm_gene_names_100.txt
-seed: 0
-device: auto
-compute_perturbation_scores: true
-cv:
-  n_splits: 5
-  n_bins: 8
-  seed: 0
-training:
-  loss_type: huber
-  huber_delta: 0.9
-  l1_lambda: 0.0
-  l2_lambda: 0.00001
-  lr: 1.0
-  epochs: 1001
-  print_every: 500
-  lbfgs_max_iter: 20
-  lbfgs_history_size: 10
-  lbfgs_line_search_fn: strong_wolfe
-  optimizer_tolerance_grad: 0.001
-  stop_tolerance_grad: 0.001
-  stop_tolerance_change: 0.0001
-  stop_on_loss: true
-  stop_on_parameter: true
-  stop_on_optimizer_step_size: false
-  stop_on_grad: false
-  patience_level: 5
-  dtype: float64
-  a_nnz_threshold: 0.000001
-hyperparameter_grid:
-  huber_delta: [0.9]
-  l2_lambda: [0.00001]
-  tolerance_change: [0.0001]
+
+trajectory:
+  expression: data/data4_trophectoderm/fig7_raw_expression.txt
+  reference_time: data/data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
 
 solvers:
+  diode:
+    seed: 0
+    device: auto
+    compute_perturbation_scores: true
+    cv:
+      n_splits: 5
+      n_bins: 8
+      seed: 0
+    training:
+      loss_type: huber
+      l1_lambda: 0.0
+      lr: 1.0
+      epochs: 1001
+      print_every: 500
+      lbfgs_max_iter: 20
+      lbfgs_history_size: 10
+      lbfgs_line_search_fn: strong_wolfe
+      optimizer_tolerance_grad: 0.001
+      stop_tolerance_grad: 0.001
+      tolerance_change: 0.0001
+      stop_on_loss: true
+      stop_on_parameter: true
+      stop_on_optimizer_step_size: false
+      stop_on_grad: false
+      patience_level: 5
+      dtype: float64
+      a_nnz_threshold: 0.000001
+
+    # Tune only this grid. Keep the other DIODE settings at their defaults.
+    hyperparameter_grid:
+      huber_delta: [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0, 1.2, 1.3, 1.7, 1.9, 2.0]
+      l2_lambda: [0.00001, 0.001, 0.0001]
   phoenix:
     phoenix_root: external/PHOENIX
     # Match the PHOENIX notebooks: smoothed expression, no prior network.

@@ -1,0 +1,21 @@
+dataset: data_example
+benchmark: false
+data_dir: data/data_example
+reference_network_dir: data/data_example
+output_dir: outputs/data_example
+expression: data/data_example/datamatrix.txt
+pseudotime: data/data_example/pseudotime.txt
+genes: data/data_example/genes.txt
+solvers:
+  diode:
+    seed: 0
+    device: auto
+    cv: {n_splits: 3, n_bins: 3, seed: 0}
+    training: {loss_type: huber, l1_lambda: 0.0, lr: 1.0, epochs: 1001, print_every: 500,
+      lbfgs_max_iter: 20, lbfgs_history_size: 10, lbfgs_line_search_fn: strong_wolfe,
+      optimizer_tolerance_grad: 0.001, stop_tolerance_grad: 0.001, tolerance_change: 0.0001,
+      stop_on_loss: true, stop_on_parameter: true, stop_on_optimizer_step_size: false,
+      stop_on_grad: false, patience_level: 5, dtype: float64, a_nnz_threshold: 1.0e-06}
+    hyperparameter_grid:
+      huber_delta: [0.01, 2.0]
+      l2_lambda: [1.0e-07, 1.0e-05]

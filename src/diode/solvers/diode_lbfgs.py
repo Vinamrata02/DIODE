@@ -846,3 +846,26 @@ def summarize_rank_stability(edge_vectors):
 
 def format_hparam(value):
     return f'{value:g}' if value != 0 else '0'
+
+
+def impute_diode(observed, mask, pseudotime, ode_predictions):
+    """Fill masked entries by pseudotime interpolation with an ODE fallback."""
+    order = np.argsort(pseudotime)
+    rank = np.empty(len(order), dtype=int)
+    rank[order] = np.arange(len(order))
+    imputed = observed.copy()
+    for gene in np.flatnonzero(mask.any(axis=0)):
+        unmasked_positions = np.flatnonzero(~mask[order, gene])
+        for cell in np.flatnonzero(mask[:, gene]):
+            split = np.searchsorted(unmasked_positions, rank[cell])
+            if split == 0 or split == len(unmasked_positions):
+                imputed[cell, gene] = ode_predictions[cell, gene]
+                continue
+            left, right = order[unmasked_positions[split - 1 : split + 1]]
+            elapsed = pseudotime[right] - pseudotime[left]
+            if elapsed == 0:
+                imputed[cell, gene] = ode_predictions[cell, gene]
+                continue
+            slope = (observed[right, gene] - observed[left, gene]) / elapsed
+            imputed[cell, gene] = observed[left, gene] + slope * (pseudotime[cell] - pseudotime[left])
+    return imputed

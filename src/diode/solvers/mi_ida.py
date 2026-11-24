@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from diode.solvers.scode import r_subprocess_env, resolve_rscript
+from diode.utils.r_runtime import r_subprocess_env, resolve_rscript
 
 
 def run_mi_ida_from_numpy(X_genes_by_cells, output_dir, runner_path, *, alpha=0.01, rscript_bin=None):

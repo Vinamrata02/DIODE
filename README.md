@@ -96,9 +96,10 @@ python scripts/check_external_methods.py
 ```
 
 SCODE requires `Rscript`, the R `MASS` package, and
-`external/SCODE/SCODE.R`. Dataset configs point to that repo-relative path. On
-module-based clusters, load an R module before starting Python or Jupyter so
-`Rscript` is available on `PATH`.
+`external/SCODE/SCODE.R`. The setup script checks MASS and installs it in
+`.r-lib/scode` if needed. SCODE can use the Rscript saved by setup, an executable
+on `PATH`, or one specified with `DIODE_RSCRIPT`. Dataset configs can also
+specify a solver-specific `rscript_bin`.
 
 GENIE3 and dynGENIE3 are distributed under `external/GENIE3` and
 `external/dynGENIE3`. They run in Python and require the package dependencies
@@ -223,13 +224,74 @@ also set `expression` to override the shared `baseline_expression`.
 
 - `Reproduce figures/Reproduce Fig.2d.ipynb`
 - `Reproduce figures/Reproduce Fig.2e.ipynb`
-- `notebooks/01_data1.ipynb`
-- `notebooks/02_data2.ipynb`
-- `notebooks/03_data3.ipynb`
-- `notebooks/04_data4_epiblast.ipynb`
-- `notebooks/05_data4_trophectoderm.ipynb`
+- `Example/data1_mouse_esc_pre.ipynb`
+- `Example/data2_mouse_mef_in.ipynb`
+- `Example/data3_human_esc_de.ipynb`
+- `Example/04_data4_epiblast.ipynb`
+- `Example/05_data4_trophectoderm.ipynb`
 
-`Reproduce figures/Reproduce Fig.2d.ipynb` (data1, Mouse MEF-PrE) and `Reproduce figures/Reproduce Fig.2e.ipynb` (data3) demonstrate the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. They can be used to run the benchmark on one selected dataset or on multiple configured datasets. The numbered notebooks provide dataset-specific reproductions with the same installed package interface.
+`Reproduce figures/Reproduce Fig.2d.ipynb` (data1, Mouse MEF-PrE) and `Reproduce figures/Reproduce Fig.2e.ipynb` (data3) demonstrate the package-level interface for running the solvers and reporting AUROC/AUPR metrics used to reproduce the paper results. They can be used to run the benchmark on one selected dataset or on multiple configured datasets. The example notebooks provide dataset-specific reproductions with the same installed package interface.
+
+## Masked-entry imputation
+
+`Reproduce figures/Reproduce Fig.5e.ipynb` and `Reproduce figures/Reproduce Fig.5f.ipynb`
+run the five configured datasets with 2% and 5% masking, respectively. Each
+notebook displays mean and sample standard deviation of RMSE across five masks
+shared by DIODE, scNODE, MIOFlow, MAGIC, and ALRA.
+
+Activate the environment used by your notebook before running the same
+setup and checks as the AUROC methods.
+
+```bash
+conda activate ode-clone
+bash scripts/setup_external_methods.sh
+python scripts/check_external_methods.py
+```
+
+- Python dependencies are listed in `requirements.txt`. On Python 3.12 and
+  later, the setup script installs MAGIC and scprep without resolving scprep's
+  older pandas pin, then smoke-tests the imports in the active environment.
+- The setup script fetches the reference checkouts into `external/scNODE`
+  and `external/MIOFlow`. Use `DIODE_SCNODE_ROOT` and `DIODE_MIOFLOW_ROOT`
+  to reuse checkouts elsewhere.
+- The setup script installs the R package ALRA under `.r-lib/alra`. Set
+  `DIODE_RSCRIPT` to an existing Rscript executable when it is outside your
+  PATH. The repository remembers that executable. Once ALRA is available,
+  the benchmark launches the R script from Python as part of each ALRA run.
+  [ALRA source](https://github.com/KlugerLab/ALRA)
+
+```python
+from diode import DIODEBenchmark
+
+results = DIODEBenchmark(dataset="data4_epiblast", masking=0.02).run(
+    task="imputation", solvers=["DIODE", "MAGIC"], progress=True
+)
+```
+
+Omit `dataset` to run all configured datasets. With `skip_unavailable=True`,
+dependency errors are recorded in `results.attrs["failures"]`. The figure
+notebooks require all five methods.
+
+## Unmasked trajectory scores
+
+`Reproduce figures/Reproduce Fig.7.ipynb` uses `.run(task="imputation")`
+with the masking fraction omitted. Explicit `masking=0.0` selects the
+same workflow. Each method runs once. DIODE returns the fitted trajectory
+from the full smooth expression matrix. The baselines use the raw
+expression configured for this figure.
+
+The table reports POS from Slingshot pseudotime, trajectory continuity,
+and same-cell vertical cosine. Trajectory continuity is computed from the
+1-nearest-neighbor fragmentation rate. The existing
+`scripts/setup_external_methods.sh` installs [Slingshot](https://bioconductor.org/packages/slingshot/)
+into `.r-lib/slingshot`, and `scripts/check_external_methods.py` checks it.
+
+Data1–Data3 use the capture-time columns in the row order used by the
+reference notebook. For Data1, the bundled labels concatenate the training
+file followed by the test file. Epiblast and trophectoderm
+use the supplied reference pseudotime for POS. The figure uses the smooth
+reference matrix for epiblast vertical cosine and the reference notebook's
+raw matrix for trophectoderm.
 
 ## Reference Networks
 
@@ -263,16 +325,16 @@ data/my_dataset/
 ├── expression.txt
 ├── pseudotime.txt
 ├── genes.txt
-├── reference_network.csv
+├── reference_network.csv         # optional for DIODE fitting
 └── reference_network_signed.csv  # optional
 ```
 
-Required files:
+Input files:
 
 - `expression.txt`: numeric expression matrix with genes as rows and cells/observations as columns. Whitespace-delimited text is supported.
 - `pseudotime.txt`: one numeric pseudotime value per cell/observation. Its length must equal the number of columns in `expression.txt`.
 - `genes.txt`: one gene name per row, in the same order as the rows of `expression.txt`.
-- `reference_network.csv`: square reference network for AUROC/AUPR evaluation. Rows are target genes and columns are source/regulator genes, in the same gene order as `genes.txt`. Nonzero entries are treated as edges. The file can be a labeled comma-separated CSV with gene names as row/column labels, a headerless whitespace-delimited numeric matrix, or a headerless comma-separated numeric matrix.
+- `reference_network.csv`: optional square reference network for DIODE fitting, required for AUROC/AUPR evaluation. Rows are target genes and columns are source/regulator genes, in the same gene order as `genes.txt`. Nonzero entries are treated as edges. The file can be a labeled comma-separated CSV with gene names as row/column labels, a headerless whitespace-delimited numeric matrix, or a headerless comma-separated numeric matrix.
 - `reference_network_signed.csv`: optional square signed reference network with the same orientation, ordering, and accepted formats. Positive and negative values are used for signed-direction metrics.
 
 Add a config such as:
@@ -280,7 +342,7 @@ Add a config such as:
 ```yaml
 dataset: my_dataset
 data_dir: data/my_dataset
-reference_network_dir: data/my_dataset
+reference_network_dir: data/my_dataset  # for evaluation
 output_dir: outputs/my_dataset
 expression: data/my_dataset/expression.txt
 # Optional: use a different expression matrix for external solvers.
@@ -288,33 +350,33 @@ expression: data/my_dataset/expression.txt
 baseline_expression: data/my_dataset/raw_expression.txt
 pseudotime: data/my_dataset/pseudotime.txt
 genes: data/my_dataset/genes.txt
-seed: 0
-device: auto
-training:
-  loss_type: huber
-  huber_delta: 1.0
-  l1_lambda: 0.0
-  l2_lambda: 0.0000001
-  lr: 1.0
-  epochs: 1001
-  print_every: 500
-  lbfgs_max_iter: 20
-  lbfgs_history_size: 10
-  lbfgs_line_search_fn: strong_wolfe
-  optimizer_tolerance_grad: 0.001
-  stop_tolerance_grad: 0.001
-  stop_tolerance_change: 0.00001
-  stop_on_loss: true
-  stop_on_parameter: true
-  stop_on_optimizer_step_size: false
-  stop_on_grad: false
-  patience_level: 5
-  dtype: float64
-  a_nnz_threshold: 0.000001
-hyperparameter_grid:
-  huber_delta: [1.0]
-  l2_lambda: [0.0000001]
-  tolerance_change: [0.00001]
+solvers:
+  diode:
+    seed: 0
+    device: auto
+    training:
+      loss_type: huber
+      l1_lambda: 0.0
+      lr: 1.0
+      epochs: 1001
+      print_every: 500
+      lbfgs_max_iter: 20
+      lbfgs_history_size: 10
+      lbfgs_line_search_fn: strong_wolfe
+      optimizer_tolerance_grad: 0.001
+      stop_tolerance_grad: 0.001
+      tolerance_change: 0.0001
+      stop_on_loss: true
+      stop_on_parameter: true
+      stop_on_optimizer_step_size: false
+      stop_on_grad: false
+      patience_level: 5
+      dtype: float64
+      a_nnz_threshold: 0.000001
+    # Tune only this grid. Keep the other DIODE settings at their defaults.
+    hyperparameter_grid:
+      huber_delta: [1.0]
+      l2_lambda: [0.0000001]
 ```
 
 Then run:
@@ -333,7 +395,7 @@ results = benchmark.run()
 results
 ```
 
-The runner sorts cells by pseudotime, performs the configured hyperparameter-selection workflow, refits the selected model on the full ordered dataset, and writes learned matrices plus AUROC/AUPR summaries to `output_dir`.
+The runner sorts cells by pseudotime, performs the configured hyperparameter-selection workflow, refits the selected model on the full ordered dataset, and writes learned matrices to `output_dir`. It includes AUROC/AUPR when a reference network is available.
 
 ## Python Interface
 

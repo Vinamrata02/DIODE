@@ -13,3 +13,21 @@ networkx
 arboreto==0.1.6
 dask[dataframe]>=2024.1.0
 distributed>=2024.1.0
+
+# Imputation baselines
+scanpy
+natsort
+geomloss
+torchdiffeq
+torchsde
+POT
+phate
+ipywidgets
+numpy<2; python_version < "3.12"
+magic-impute==3.0.0; python_version < "3.12"
+# On Python 3.12+, setup_external_methods.sh installs MAGIC
+# and scprep without resolving scprep's pandas<2.1 pin.
+future; python_version >= "3.12"
+tasklogger>=1; python_version >= "3.12"
+graphtools>=1.4; python_version >= "3.12"
+decorator>=4.3; python_version >= "3.12"

@@ -2,35 +2,12 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import numpy as np
 
-def resolve_rscript(rscript_bin=None):
-    if rscript_bin is None:
-        candidates = [shutil.which("Rscript"), "/usr/local/bin/Rscript", "/usr/bin/Rscript"]
-        rscript_bin = next((path for path in candidates if path and os.path.exists(path)), None)
-    elif not os.path.isabs(rscript_bin):
-        rscript_bin = shutil.which(rscript_bin) or rscript_bin
-    if rscript_bin is None or not os.path.exists(rscript_bin):
-        raise FileNotFoundError("Could not find Rscript. Set rscript_bin='/full/path/to/Rscript'.")
-    return rscript_bin
-
-
-def r_subprocess_env():
-    """Return an environment for R subprocesses without MATLAB runtime paths."""
-    env = os.environ.copy()
-    ld_library_path = env.get("LD_LIBRARY_PATH")
-    if ld_library_path:
-        parts = [
-            part for part in ld_library_path.split(os.pathsep)
-            if "matlab" not in part.lower()
-        ]
-        env["LD_LIBRARY_PATH"] = os.pathsep.join(parts)
-    return env
+from diode.utils.r_runtime import r_subprocess_env, resolve_repo_r_runtime, resolve_rscript
 
 
 def run_scode_from_numpy(
@@ -41,6 +18,7 @@ def run_scode_from_numpy(
     model_params=None,
     scode_r_path="../SCODE/scode/SCODE.R",
     rscript_bin=None,
+    repo_root=None,
     work_dir="../Data/datasim",
 ):
     X_sim = np.asarray(X_sim, dtype=float)
@@ -64,7 +42,10 @@ def run_scode_from_numpy(
     if model_params:
         params.update(model_params)
 
-    rscript_bin = resolve_rscript(rscript_bin)
+    if repo_root is None:
+        rscript_bin, env = resolve_rscript(rscript_bin), r_subprocess_env()
+    else:
+        rscript_bin, env = resolve_repo_r_runtime(repo_root, "scode", rscript_bin)
     scode_r_path = Path(scode_r_path)
     if not scode_r_path.exists():
         raise FileNotFoundError(f"SCODE.R not found: {scode_r_path}")
@@ -80,7 +61,7 @@ def run_scode_from_numpy(
         str(params["C"]),
         str(params["num_iterations"]),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, env=r_subprocess_env())
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise RuntimeError(
             "SCODE failed:\n"
@@ -103,6 +84,7 @@ def run_scode_repeated_from_numpy(
     model_params=None,
     scode_r_path="../SCODE/scode/SCODE.R",
     rscript_bin=None,
+    repo_root=None,
     work_dir="../Data/datasim",
 ):
     out_dir = Path(out_dir)
@@ -119,6 +101,7 @@ def run_scode_repeated_from_numpy(
             model_params=model_params,
             scode_r_path=scode_r_path,
             rscript_bin=rscript_bin,
+            repo_root=repo_root,
             work_dir=trial_work_dir,
         )
         A_trials.append(A_trial)

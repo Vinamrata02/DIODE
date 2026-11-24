@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from diode.solvers.scode import r_subprocess_env, resolve_rscript
+from diode.utils.r_runtime import r_subprocess_env, resolve_rscript
 
 
 def run_r_matrix_method(r_script, input_path, output_path, *, rscript_bin=None):

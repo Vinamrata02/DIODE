@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
@@ -90,9 +91,7 @@ def run_phoenix_from_numpy(
     if not isinstance(params["normalize_data"], bool):
         raise ValueError("PHOENIX normalize_data must be a boolean.")
 
-    if phoenix_root is None:
-        phoenix_root = Path(__file__).resolve().parents[3] / "external" / "PHOENIX"
-    code_dir = Path(phoenix_root).expanduser().resolve() / "ode_net" / "code"
+    code_dir = _phoenix_code_dir(phoenix_root)
     required = ("odenet.py", "datahandler.py", "csvreader.py", "figure_saver.py",
                 "read_config.py", "torchdiffeq/__init__.py")
     missing = [name for name in required if not (code_dir / name).is_file()]
@@ -148,3 +147,32 @@ def run_phoenix_from_numpy(
     if A.shape != (X.shape[0], X.shape[0]) or not np.isfinite(A).all():
         raise RuntimeError("PHOENIX returned an invalid score matrix.")
     return A, result
+
+
+def _phoenix_code_dir(phoenix_root):
+    if phoenix_root is None:
+        phoenix_root = Path(__file__).resolve().parents[3] / "external" / "PHOENIX"
+    return Path(phoenix_root).expanduser().resolve() / "ode_net" / "code"
+
+
+def predict_phoenix_trajectory(fit_dir, phoenix_root, pseudotime, initial_state):
+    """Integrate the best saved checkpoint and return expression in input units."""
+    code_dir = _phoenix_code_dir(phoenix_root)
+    for path in (code_dir / "odenet.py", fit_dir / "best_train_model.pt"):
+        if not path.is_file():
+            raise FileNotFoundError(path)
+    raw_time = np.loadtxt(fit_dir / "raw_pseudotime.csv", delimiter=",", ndmin=1)
+    if raw_time.shape != pseudotime.shape or not np.allclose(raw_time, pseudotime):
+        raise ValueError(f"Saved PHOENIX pseudotime differs from the dataset in {fit_dir}.")
+
+    worker = Path(__file__).with_name("_phoenix_worker.py")
+    with TemporaryDirectory(prefix="diode-phoenix-predict-") as work:
+        input_path, output_path = Path(work) / "initial.npy", Path(work) / "prediction.npy"
+        np.save(input_path, initial_state)
+        result = subprocess.run(
+            [sys.executable, str(worker), str(code_dir), str(fit_dir), str(input_path), str(output_path)],
+            capture_output=True, text=True,
+        )
+        if result.returncode:
+            raise RuntimeError(f"PHOENIX prediction failed for {fit_dir}:\n{result.stderr or result.stdout}")
+        return np.load(output_path)

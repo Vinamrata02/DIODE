@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import sys
 import time
 from pathlib import Path
 
@@ -16,15 +17,14 @@ from diode.utils.evaluations import aupr_from_matrices, auroc_from_matrices, f1_
 from diode.utils.io import load_config, load_ordered_expression_dataset, resolve_path, save_model_outputs
 
 try:
-    from tqdm.auto import tqdm as auto_tqdm
-
-    try:
-        from tqdm.notebook import tqdm as notebook_tqdm
-    except ImportError:  # pragma: no cover - notebook backend is optional.
-        notebook_tqdm = None
-except ImportError:  # pragma: no cover - tqdm is optional at runtime.
-    auto_tqdm = None
+    from tqdm.notebook import IProgress, tqdm as notebook_tqdm
+except ImportError:  # pragma: no cover - notebook widgets are optional.
+    IProgress = None
     notebook_tqdm = None
+
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover - tqdm is optional at runtime.
 
     class _NullTqdm:
         def __init__(self, iterable=None, **kwargs):
@@ -45,7 +45,7 @@ except ImportError:  # pragma: no cover - tqdm is optional at runtime.
         def close(self):
             return None
 
-    def auto_tqdm(iterable=None, **kwargs):
+    def tqdm(iterable=None, **kwargs):
         return _NullTqdm(iterable, **kwargs)
 
 
@@ -150,6 +150,8 @@ def _discover_dataset_configs(repo_root=None):
     for config_path in sorted(configs_dir.glob("*.yaml")):
         with config_path.open("r", encoding="utf-8") as handle:
             config = yaml.safe_load(handle) or {}
+        if config.get("benchmark") is False:
+            continue
         dataset = str(config.get("dataset") or config_path.stem)
         dataset_configs[dataset] = config_path.relative_to(root)
     return dataset_configs
@@ -160,18 +162,24 @@ class DIODEBenchmark:
 
     @_ClassOrInstanceProperty
     def datasets(cls, obj=None):
-        """Available dataset names discovered from configs/*.yaml."""
+        """Available benchmark datasets discovered from configs/*.yaml."""
         repo_root = obj.repo_root if obj is not None else None
         return tuple(_discover_dataset_configs(repo_root))
 
     @_ClassOrInstanceProperty
     def solvers(cls, obj=None):
         """Solvers available through this high-level interface."""
+        if obj is not None and obj.masking is not None:
+            from diode.runners.run_dataset import IMPUTATION_METHODS
+
+            return tuple(IMPUTATION_METHODS.values())
         return SOLVER_NAMES
 
-    def __init__(self, dataset=None, repo_root=None):
+    def __init__(self, dataset=None, repo_root=None, *, masking=None):
         self.dataset = dataset
+        self.masking = masking
         self.repo_root = self._resolve_repo_root(repo_root)
+        self._prediction_run = None
 
     def config_path(self, dataset):
         """Return the config path for a named dataset."""
@@ -183,14 +191,14 @@ class DIODEBenchmark:
             raise ValueError(f"Unknown dataset {dataset!r}. Available datasets: {available}") from exc
         return self.repo_root / relative_path
 
-    def run(self, solvers=None, datasets=None, skip_unavailable=True, progress=True):
+    def run(self, solvers=None, datasets=None, skip_unavailable=True, progress=True, *, task=None):
         """Run selected solvers and return a tidy metrics table.
 
         Parameters
         ----------
         solvers:
-            Solver names to evaluate. Defaults to all solvers exposed by
-            `DIODEBenchmark.solvers`. External solvers require their
+            Solver names to evaluate. Defaults to all solvers for the selected
+            task. External solvers require their
             package/script/output paths to be configured before they can run.
         datasets:
             Dataset names to evaluate. Defaults to the dataset passed at
@@ -199,45 +207,58 @@ class DIODEBenchmark:
             If true, known solvers with missing optional dependencies or paths are
             returned as status rows instead of raising an error.
         progress:
-            If true, show nested tqdm progress bars over datasets and methods.
+            If true, show nested progress bars over datasets and solver runs.
+        task:
+            "auroc" or "imputation". When omitted, a masking fraction selects
+            imputation. Explicit imputation with masking omitted or zero scores
+            unmasked trajectories. The default without either argument is AUROC.
         """
-        selected_solvers = self._resolve_solvers(solvers)
-        selected_datasets = self._resolve_datasets(datasets)
+        from diode.runners.run_dataset import IMPUTATION_COLUMNS, TRAJECTORY_COLUMNS, run_dataset, validate_task
 
+        inferred_imputation = task is None and self.masking is not None
+        if task is None:
+            task = "imputation" if inferred_imputation else "auroc"
+        validate_task(task, self.masking)
+        selected_solvers = self._resolve_solvers(solvers, task=task)
+        selected_datasets = self._resolve_datasets(datasets)
+        config_paths = [(dataset, self.config_path(dataset)) for dataset in selected_datasets]
+        if inferred_imputation:
+            print(f"Running the imputation benchmark with {100 * self.masking:g}% masking.")
+
+        self._prediction_run = None
+        fit_datasets = []
         rows = []
-        dataset_iter = self._progress(selected_datasets, enabled=progress, desc="Datasets", leave=True, position=0)
-        last_dataset = selected_datasets[-1] if selected_datasets else None
-        for dataset in dataset_iter:
+        failures = []
+        dataset_iter = self._progress(
+            config_paths, enabled=progress, desc="Datasets", leave=True, position=0,
+        )
+        for index, (dataset, config_path) in enumerate(dataset_iter, start=1):
             if hasattr(dataset_iter, "set_description"):
                 dataset_iter.set_description(f"Dataset: {dataset}")
-            solver_bar = self._solver_progress_bar(
-                selected_solvers,
-                enabled=progress,
-                leave=(dataset == last_dataset),
+            result = run_dataset(
+                config_path,
+                task=task,
+                solvers=selected_solvers,
+                masking=self.masking,
+                skip_unavailable=skip_unavailable,
+                progress=progress,
+                _run_solver=self._run_solver if task == "auroc" else None,
+                _leave_solver_progress=index == len(config_paths),
             )
-            try:
-                for solver in selected_solvers:
-                    if solver_bar is not None:
-                        solver_bar.set_description(f"Running: {SOLVER_LABELS[solver]}")
-                        solver_bar.refresh()
-                    try:
-                        rows.append(self._run_solver(dataset, solver))
-                    except SolverUnavailableError as exc:
-                        if not skip_unavailable:
-                            raise
-                        rows.append({
-                            "dataset": dataset,
-                            "solver": solver,
-                            "status": "not_available",
-                            "message": str(exc),
-                        })
-                    finally:
-                        if solver_bar is not None:
-                            solver_bar.update(1)
-            finally:
-                if solver_bar is not None:
-                    solver_bar.close()
+            rows.extend(result["rows"])
+            failures.extend(result.get("failures", ()))
+            if task == "auroc":
+                fit_datasets.append((dataset, config_path, tuple(
+                    row["solver"] for row in result["rows"] if row.get("status") == "ok"
+                )))
 
+        if task == "imputation":
+            columns = TRAJECTORY_COLUMNS if self.masking in (None, 0) else IMPUTATION_COLUMNS
+            results = pd.DataFrame(rows, columns=columns)
+            results.attrs["failures"] = failures
+            return results
+
+        self._prediction_run = fit_datasets
         results = pd.DataFrame(rows)
         for column in RESULT_COLUMNS:
             if column not in results.columns:
@@ -246,29 +267,41 @@ class DIODEBenchmark:
         ordered = list(RESULT_COLUMNS)
         return results.loc[:, ordered] if not results.empty else results
 
-    def run_all(self, solvers=None, skip_unavailable=True, progress=True):
-        """Run selected solvers on all configured datasets."""
-        return self.run(solvers=solvers, datasets=self.datasets, skip_unavailable=skip_unavailable, progress=progress)
+    def predict(self, genes):
+        """Return fitted expression for genes from this instance's latest AUROC run."""
+        from diode.runners.predict import predict_fitted_expression
 
-    def _run_solver(self, dataset, solver):
+        if self._prediction_run is None:
+            raise ValueError("Call .run() for the AUROC task on this benchmark before .predict().")
+        return predict_fitted_expression(self._prediction_run, genes)
+
+    def run_all(self, solvers=None, skip_unavailable=True, progress=True, *, task=None):
+        """Run selected solvers on all configured datasets."""
+        return self.run(
+            solvers=solvers, datasets=self.datasets, skip_unavailable=skip_unavailable,
+            progress=progress, task=task,
+        )
+
+    def _run_solver(self, dataset, solver, *, config_path=None):
+        config_path = self.config_path(dataset) if config_path is None else config_path
         if solver == "diode":
-            from diode.runners.run_dataset import run_dataset
+            from diode.runners.run_dataset import _tune_diode
 
             with contextlib.redirect_stdout(io.StringIO()):
-                result = run_dataset(self.config_path(dataset))
+                result = _tune_diode(config_path)
             row = dict(result["metrics"])
             row["dataset"] = dataset
             row["solver"] = "diode"
             row["status"] = "ok"
             return row
         try:
-            return self._run_baseline_solver(dataset, solver)
+            return self._run_baseline_solver(dataset, solver, config_path=config_path)
         except Exception as exc:
             raise SolverUnavailableError(f"{solver} unavailable: {exc}") from exc
 
-    def _run_baseline_solver(self, dataset, solver):
+    def _run_baseline_solver(self, dataset, solver, *, config_path=None):
         start_time = time.perf_counter()
-        config_path = self.config_path(dataset)
+        config_path = self.config_path(dataset) if config_path is None else config_path
         config = load_config(config_path)
         root = self._resolve_config_repo_root(config, config_path)
         solver_cfg = self._solver_config(config, solver)
@@ -367,6 +400,7 @@ class DIODEBenchmark:
                 model_params=solver_cfg.get("model_params"),
                 scode_r_path=resolve_path(scode_r_path, root),
                 rscript_bin=solver_cfg.get("rscript_bin"),
+                repo_root=root,
                 work_dir=baseline_dir / "work",
             )[0]
 
@@ -379,8 +413,8 @@ class DIODEBenchmark:
                 baseline_dir,
                 phoenix_root=resolve_path(solver_cfg.get("phoenix_root", "external/PHOENIX"), root),
                 model_params=solver_cfg.get("model_params"),
-                device=solver_cfg.get("device", config.get("device", "auto")),
-                seed=int(solver_cfg.get("seed", config.get("seed", 0))),
+                device=solver_cfg.get("device", "auto"),
+                seed=int(solver_cfg.get("seed", 0)),
                 time_policy=solver_cfg.get("time_policy", "rank_if_tied"),
             )[0]
 
@@ -468,9 +502,13 @@ class DIODEBenchmark:
             return [self.dataset]
         return list(self.datasets)
 
-    def _resolve_solvers(self, solvers):
+    def _resolve_solvers(self, solvers, *, task="auroc"):
+        if task == "imputation":
+            from diode.runners.run_dataset import resolve_imputation_solvers
+
+            return resolve_imputation_solvers(solvers)
         if solvers is None or solvers == "all":
-            solvers = self.solvers
+            solvers = SOLVER_NAMES
         if isinstance(solvers, str):
             solvers = [solvers]
         resolved = []
@@ -479,7 +517,7 @@ class DIODEBenchmark:
             try:
                 resolved.append(SOLVER_ALIASES[key])
             except KeyError as exc:
-                available = ", ".join(self.solvers)
+                available = ", ".join(SOLVER_NAMES)
                 raise ValueError(f"Unsupported solver {solver!r}. Available solvers: {available}") from exc
         return resolved
 
@@ -499,17 +537,16 @@ class DIODEBenchmark:
     def _progress(iterable, *, enabled, **kwargs):
         if not enabled:
             return iterable
-        return _tqdm()(iterable, dynamic_ncols=True, **kwargs)
+        return _progress_bar(iterable, **kwargs)
 
     @staticmethod
-    def _solver_progress_bar(solvers, *, enabled, leave):
+    def _solver_progress_bar(total, *, enabled, leave):
         if not enabled:
             return None
-        return _tqdm()(
-            total=len(solvers),
+        return _progress_bar(
+            total=total,
             desc="Running",
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
-            dynamic_ncols=True,
             leave=leave,
             mininterval=0,
             miniters=1,
@@ -535,10 +572,12 @@ class DIODEBenchmark:
         return Path(__file__).resolve().parents[2]
 
 
-def _tqdm():
-    if notebook_tqdm is not None and _running_in_notebook():
-        return notebook_tqdm
-    return auto_tqdm
+def _progress_bar(*args, **kwargs):
+    if _running_in_notebook():
+        if IProgress is not None:
+            return notebook_tqdm(*args, dynamic_ncols=True, **kwargs)
+        return tqdm(*args, file=sys.stdout, **kwargs)
+    return tqdm(*args, dynamic_ncols=True, **kwargs)
 
 
 def _running_in_notebook():

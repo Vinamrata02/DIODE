@@ -317,3 +317,68 @@ def dominant_eigenvalue_sensitivity_scores(A_matrix):
 
     sensitivity = np.outer(w, v) / denom
     return np.abs(sensitivity), sensitivity, dominant_eigenvalue
+
+
+def vertical_cosine_scores(method_matrix, raw_matrix):
+    """Score expression similarity between matched cells."""
+    method = np.asarray(method_matrix, dtype=float)
+    raw = np.asarray(raw_matrix, dtype=float)
+    if method.ndim != 2 or method.shape != raw.shape:
+        raise ValueError("Vertical cosine requires aligned cells-by-genes matrices.")
+    method = method / np.maximum(np.linalg.norm(method, axis=1, keepdims=True), 1e-12)
+    raw = raw / np.maximum(np.linalg.norm(raw, axis=1, keepdims=True), 1e-12)
+    cosine = np.clip((method * raw).sum(axis=1), -1.0, 1.0)
+    return {
+        "vertical_cosine_score": float(((1.0 + cosine) / 2.0).mean()),
+        "mean_same_cell_cosine": float(cosine.mean()),
+        "median_same_cell_cosine": float(np.median(cosine)),
+    }
+
+
+def ordered_fragmentation_k1(matrix, order):
+    """Measure the share of ordered steps broken in the symmetrized 1-NN graph."""
+    from scipy.sparse.csgraph import shortest_path
+    from sklearn.neighbors import kneighbors_graph
+
+    matrix = np.asarray(matrix, dtype=float)
+    order = np.asarray(order, dtype=int)
+    if matrix.ndim != 2 or len(matrix) < 2:
+        raise ValueError("Trajectory fragmentation requires at least two cells.")
+    if not np.array_equal(np.sort(order), np.arange(len(matrix))):
+        raise ValueError("Trajectory order must be a permutation of the cells.")
+    graph = kneighbors_graph(matrix, n_neighbors=1, mode="distance", include_self=False)
+    graph = graph.maximum(graph.T)
+    distances = shortest_path(graph, directed=False, indices=order[:-1])
+    breaks = ~np.isfinite(distances[np.arange(order.size - 1), order[1:]])
+    return float(breaks.mean())
+
+
+def minmax_lower_is_better_score(values, *, bounds=None):
+    """Reverse min–max scaling using reference bounds when provided."""
+    values = pd.Series(values, dtype=float)
+    finite = values[np.isfinite(values)]
+    if bounds is None:
+        if finite.nunique() <= 1:
+            return values.where(~np.isfinite(values), 1.0)
+        lower, upper = finite.min(), finite.max()
+    else:
+        lower, upper = bounds
+        if not 0 <= lower < upper <= 1:
+            raise ValueError("Fragmentation bounds must satisfy 0 <= lower < upper <= 1.")
+    return (1.0 - (values - lower) / (upper - lower)).clip(0, 1)
+
+
+def paper_pos_score(pseudotime, real_time):
+    """Count concordant pairs among finite pairs without ties on either axis."""
+    pseudotime = np.asarray(pseudotime, dtype=float).reshape(-1)
+    real_time = np.asarray(real_time, dtype=float).reshape(-1)
+    if pseudotime.shape != real_time.shape:
+        raise ValueError("POS requires a reference time for every cell.")
+    i, j = np.triu_indices(real_time.size, k=1)
+    real_delta = real_time[j] - real_time[i]
+    inferred_delta = pseudotime[j] - pseudotime[i]
+    valid = np.isfinite(real_delta) & np.isfinite(inferred_delta)
+    valid &= (real_delta != 0) & (inferred_delta != 0)
+    if not valid.any():
+        return np.nan
+    return float((np.sign(real_delta[valid]) == np.sign(inferred_delta[valid])).mean())

@@ -27,14 +27,32 @@ install_r_dependencies() {
     return 0
   fi
 
-  if ! command -v Rscript >/dev/null 2>&1; then
-    warn "Could not install R dependencies because Rscript is not on PATH. Please follow the R dependency instructions in README.md before running R-backed methods."
+  local rscript
+  local library="${repo_root}/.r-lib/scode"
+  if ! rscript="$(resolve_setup_rscript "${library}")"; then
+    warn "Rscript is unavailable. Set DIODE_RSCRIPT or put Rscript on PATH before installing R dependencies."
     return 0
   fi
 
-  printf 'Checking R dependencies for SCODE/Lasso/MI/IDA...\n'
-  if ! Rscript -e "
-required <- c('MASS', 'infotheo', 'msgps', 'BiocManager')
+  mkdir -p "${library}"
+  if PATH="$(dirname "${rscript}"):${PATH}" R_LIBS="${library}${R_LIBS:+:${R_LIBS}}" \
+    "${rscript}" --vanilla - "${library}" <<'RS'
+lib <- commandArgs(trailingOnly = TRUE)[1L]
+if (!requireNamespace("MASS", quietly = TRUE)) {
+  install.packages("MASS", lib = lib, repos = "https://cloud.r-project.org")
+}
+stopifnot(requireNamespace("MASS", quietly = TRUE))
+RS
+  then
+    "${rscript}" --vanilla -e 'cat(normalizePath(commandArgs(trailingOnly = TRUE)[1]), "\n", sep="")' \
+      "${rscript}" > "${library}/rscript-path"
+  else
+    warn "Could not install MASS for SCODE with Rscript at ${rscript}."
+  fi
+
+  printf 'Checking R dependencies for Lasso/MI/IDA...\n'
+  if ! "${rscript}" -e "
+required <- c('infotheo', 'msgps', 'BiocManager')
 missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing)) {
   install.packages(missing, repos='https://cloud.r-project.org')
@@ -46,7 +64,7 @@ if (!requireNamespace('pcalg', quietly = TRUE)) {
   install.packages('pcalg', repos='https://cloud.r-project.org')
 }
 " ; then
-    warn "Could not install all R dependencies with Rscript at $(command -v Rscript). Please follow the R dependency instructions in README.md before running SCODE, Lasso, MI, or IDA."
+    warn "Could not install all R dependencies with Rscript at ${rscript}. Please follow the R dependency instructions in README.md before running Lasso, MI, or IDA."
   fi
 }
 
@@ -78,6 +96,111 @@ ensure_external_repo() {
   git -C "${dir}" checkout "${ref}"
 }
 
+resolve_setup_rscript() {
+  local requested_rscript="${DIODE_RSCRIPT:-}"
+  local file saved_rscript
+  if [[ -z "${requested_rscript}" ]]; then
+    for file in "$1/rscript-path" "${repo_root}/.r-lib/alra/rscript-path"; do
+      if [[ -s "${file}" ]]; then
+        saved_rscript="$(<"${file}")"
+        if [[ -f "${saved_rscript}" && -x "${saved_rscript}" ]]; then
+          requested_rscript="${saved_rscript}"
+          break
+        fi
+      fi
+    done
+  fi
+  command -v "${requested_rscript:-Rscript}"
+}
+
+install_alra() {
+  if [[ "${install_r_deps}" == "0" ]]; then
+    return 0
+  fi
+
+  local rscript
+  local library="${repo_root}/.r-lib/alra"
+  local url="https://github.com/KlugerLab/ALRA/archive/f34d46570b1221179047d9f99c235ed880cc3bae.tar.gz"
+  if ! rscript="$(resolve_setup_rscript "${library}")"; then
+    warn "ALRA requires an existing Rscript. Set DIODE_RSCRIPT to its executable path."
+    return 0
+  fi
+
+  mkdir -p "${library}"
+  if ! R_LIBS="${library}${R_LIBS:+:${R_LIBS}}" "${rscript}" --vanilla - "${library}" "${url}" <<'RS'
+args <- commandArgs(trailingOnly = TRUE)
+lib <- args[1L]
+if (!requireNamespace("rsvd", quietly = TRUE)) {
+  install.packages("rsvd", lib = lib, repos = "https://cloud.r-project.org")
+}
+if (!requireNamespace("ALRA", quietly = TRUE)) {
+  install.packages(args[2L], lib = lib, repos = NULL, type = "source")
+}
+stopifnot(requireNamespace("ALRA", quietly = TRUE))
+RS
+  then
+    warn "Could not install ALRA with Rscript at ${rscript}."
+    return 0
+  fi
+
+  "${rscript}" --vanilla -e 'cat(normalizePath(commandArgs(trailingOnly = TRUE)[1]), "\n", sep="")' \
+    "${rscript}" > "${library}/rscript-path"
+}
+
+install_slingshot() {
+  if [[ "${install_r_deps}" == "0" ]]; then
+    return 0
+  fi
+
+  local rscript
+  local library="${repo_root}/.r-lib/slingshot"
+  if ! rscript="$(resolve_setup_rscript "${library}")"; then
+    warn "Fig. 7 requires Rscript for Slingshot. Set DIODE_RSCRIPT to its executable path."
+    return 0
+  fi
+
+  mkdir -p "${library}"
+  if ! PATH="$(dirname "${rscript}"):${PATH}" R_LIBS="${library}${R_LIBS:+:${R_LIBS}}" \
+    "${rscript}" - "${library}" <<'RS'
+lib <- commandArgs(trailingOnly = TRUE)[1L]
+required <- c("slingshot", "DelayedMatrixStats")
+missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager", lib = lib, repos = "https://cloud.r-project.org")
+  }
+  BiocManager::install(missing, lib = lib, ask = FALSE, update = FALSE, dependencies = NA)
+}
+stopifnot(all(vapply(required, requireNamespace, logical(1), quietly = TRUE)))
+RS
+  then
+    warn "Could not install the Slingshot R package at ${library}."
+    return 0
+  fi
+
+  "${rscript}" --vanilla -e 'cat(normalizePath(commandArgs(trailingOnly = TRUE)[1]), "\n", sep="")' \
+    "${rscript}" > "${library}/rscript-path"
+}
+
+install_imputation_methods() {
+  local python_bin="${DIODE_PYTHON:-python}"
+  local scnode_dir="${DIODE_SCNODE_ROOT:-${external_dir}/scNODE}"
+  local mioflow_dir="${DIODE_MIOFLOW_ROOT:-${external_dir}/MIOFlow}"
+  ensure_external_repo "scNODE" "${scnode_dir}" https://github.com/rsinghlab/scNODE.git \
+    ba55e8ddecfb74874047517952ab799326b4126d "${scnode_dir}/optim/running.py"
+  ensure_external_repo "MIOFlow" "${mioflow_dir}" https://github.com/KrishnaswamyLab/MIOFlow.git \
+    ec4b8ba06784aeba0f6e2be6c6204a8e806e1c77 "${mioflow_dir}/mioflow/mioflow.py"
+
+  "${python_bin}" -m pip install -r "${repo_root}/requirements.txt"
+  if "${python_bin}" -c 'import sys; sys.exit(sys.version_info < (3, 12))'; then
+    # scprep's old pandas constraint would replace the existing pandas build.
+    "${python_bin}" -m pip install --no-deps magic-impute==3.0.0 scprep==1.2.3
+  fi
+  "${python_bin}" -c 'import magic, scanpy, geomloss, torchdiffeq, torchsde, ot, phate'
+  install_alra
+  install_slingshot
+}
+
 mkdir -p "${external_dir}"
 
 install_r_dependencies
@@ -85,6 +208,7 @@ install_r_dependencies
 ensure_external_repo "SCODE" "${scode_dir}" "${scode_repo_url}" "${scode_ref}" "${scode_dir}/SCODE.R"
 ensure_external_repo "GRISLI" "${grisli_dir}" "${grisli_repo_url}" "${grisli_ref}" "${grisli_dir}/GRISILI.m"
 ensure_external_repo "PHOENIX" "${phoenix_dir}" "${phoenix_repo_url}" "${phoenix_ref}" "${phoenix_dir}/ode_net/code/odenet.py"
+install_imputation_methods
 
 # GRNBoost2 is packaged by Arboreto, so no separate git checkout is needed.
 grnboost2_python="${GRNBOOST2_PYTHON:-python}"

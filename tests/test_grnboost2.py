@@ -113,8 +113,8 @@ class GRNBoost2Tests(unittest.TestCase):
         self.assertIn("GRNBoost2", benchmark.solvers)
         for alias in ("GRNBoost2", "grnboost2", "grn_boost2"):
             self.assertEqual(benchmark._resolve_solvers(alias), ["grnboost2"])
-        for path in (REPO_ROOT / "configs").glob("*.yaml"):
-            config = yaml.safe_load(path.read_text())
+        for dataset in benchmark.datasets:
+            config = yaml.safe_load(benchmark.config_path(dataset).read_text())
             self.assertEqual(config["solvers"]["grnboost2"],
                              {"seed": 20, "n_workers": 1, "threads_per_worker": 1})
 

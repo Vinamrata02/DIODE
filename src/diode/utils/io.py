@@ -24,6 +24,11 @@ def load_config(config_path) -> dict:
     return config
 
 
+def diode_config(config: dict) -> dict:
+    """Read solver-specific DIODE settings."""
+    return (config.get("solvers") or {}).get("diode") or {}
+
+
 def resolve_path(path, base_dir=None) -> Path:
     """Resolve a path relative to the repository root or a supplied base."""
     path = Path(path)
@@ -39,6 +44,16 @@ def read_gene_names(path) -> list[str]:
     if isinstance(values, str):
         return [values]
     return np.asarray(values, dtype=str).reshape(-1).tolist()
+
+
+def optional_reference_dir(config, root):
+    """Return the configured reference directory when it contains a reference."""
+    directory = config.get("reference_network_dir")
+    if directory:
+        path = resolve_path(directory, root)
+        if (path / "reference_network.csv").is_file():
+            return path
+    return None
 
 
 def load_reference_network(reference_dir, gene_names=None):
@@ -114,7 +129,7 @@ def load_ordered_expression_dataset(
     dtype=torch.float32,
     sort_kind="stable",
 ):
-    """Load genes-by-cells data, with configurable tensor precision and tie ordering."""
+    """Load genes-by-cells data. Use sort_kind=None to preserve file order."""
     expression = np.loadtxt(expression_path)
     pseudotime = np.loadtxt(pseudotime_path)
     gene_names = read_gene_names(gene_names_path)
@@ -125,7 +140,7 @@ def load_ordered_expression_dataset(
             f"({len(gene_names)}, {pseudotime.size}); found {expression.shape}."
         )
 
-    perm = np.argsort(pseudotime, kind=sort_kind)
+    perm = np.argsort(pseudotime, kind=sort_kind) if sort_kind is not None else slice(None)
     time_sorted = pseudotime[perm]
     expression_sorted = expression[:, perm]
     expression_cells_by_genes = expression_sorted.T

@@ -300,3 +300,78 @@ def plot_error_auroc_relationships(all_history_df, stop_rows_df, output_path=Non
     if correlation_csv is not None:
         correlation_df.to_csv(correlation_csv, index=False)
     return correlation_df
+
+
+def plot_expression_trajectories(predictions, *, datasets=None, solvers=None):
+    """Plot fitted lines over smooth observations. Return a figure per dataset."""
+    if isinstance(datasets, str):
+        datasets = [datasets]
+    if isinstance(solvers, str):
+        solvers = [solvers]
+    if datasets is not None:
+        predictions = predictions[predictions["dataset"].isin(datasets)]
+    if solvers is not None:
+        predictions = predictions[predictions["solver"].isin(solvers)]
+    if predictions.empty:
+        raise ValueError("No fitted expression matches the requested plot.")
+
+    styles = {
+        "DIODE": ("blue", "DIODE fit", 3),
+        "SCODE": ("tab:orange", "SCODE fit", 2),
+        "PHOENIX": ("#CC79A7", "PHOENIX fit", 1),
+    }
+    figures = {}
+    with plt.rc_context({
+        "font.family": "sans-serif", "font.sans-serif": ["Arial", "DejaVu Sans"],
+        "font.size": 12, "svg.fonttype": "none",
+    }):
+        for dataset, frame in predictions.groupby("dataset", sort=False):
+            ranking = frame.groupby("gene", sort=False)["diode_auroc"].first()
+            genes = ranking.sort_values(ascending=False, kind="stable").index
+            ncols = min(10, len(genes))
+            nrows = (len(genes) + ncols - 1) // ncols
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=(max(5.5, 2.9 * ncols), max(3, 1.8 * nrows)),
+                sharex=True, squeeze=False,
+            )
+            handles = {}
+            for index, (ax, gene) in enumerate(zip(axes.flat, genes)):
+                panel = frame[frame["gene"] == gene]
+                observed = panel[panel["solver"] == panel["solver"].iloc[0]].sort_values("pseudotime", kind="stable")
+                handles["Smooth observations"] = ax.scatter(
+                    observed["pseudotime"], observed["observed_smooth"], s=5, facecolors="none",
+                    edgecolors="black", linewidths=0.35, alpha=0.75, zorder=4,
+                )
+                for solver, (color, label, zorder) in styles.items():
+                    fitted = panel[panel["solver"] == solver].sort_values("pseudotime", kind="stable")
+                    if not fitted.empty:
+                        handles[label], = ax.plot(
+                            fitted["pseudotime"], fitted["predicted_expression"],
+                            color=color, linewidth=0.85, zorder=zorder,
+                        )
+                score = ranking[gene]
+                auroc = "NA" if pd.isna(score) else f"{score:.2f}"
+                ax.set_title(f"{gene} (AUROC={auroc})", fontsize=10, pad=2)
+                ax.tick_params(axis="both", width=0.5, length=2)
+                for spine in ("top", "right"):
+                    ax.spines[spine].set_visible(False)
+                for spine in ("left", "bottom"):
+                    ax.spines[spine].set_linewidth(0.5)
+                panel_label = chr(ord("a") + index) if index < 26 else f"a{index}"
+                ax.text(
+                    -0.10, 1.01, panel_label, transform=ax.transAxes, fontsize=12, fontweight="bold",
+                    ha="right", va="bottom", clip_on=False,
+                )
+            for ax in list(axes.flat)[len(genes):]:
+                ax.axis("off")
+            fig.legend(
+                handles.values(), handles.keys(), loc="upper center",
+                ncol=min(len(handles), 2 if ncols <= 2 else 4), frameon=False,
+                bbox_to_anchor=(0.5, 0.95),
+            )
+            fig.supxlabel("Real saved pseudotime")
+            fig.supylabel("Expression")
+            fig.suptitle(f"{dataset} fitted expression trajectories")
+            fig.tight_layout(rect=(0.015, 0.015, 1, 0.82 if ncols <= 2 else 0.90))
+            figures[dataset] = fig
+    return figures

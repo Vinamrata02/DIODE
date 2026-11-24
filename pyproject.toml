@@ -26,12 +26,31 @@ grnboost2 = [
     "dask[dataframe]>=2024.1.0",
     "distributed>=2024.1.0",
 ]
+imputation = [
+    "numpy<2; python_version < '3.12'",
+    "scanpy",
+    "natsort",
+    "ipywidgets",
+    "magic-impute==3.0.0; python_version < '3.12'",
+    "future; python_version >= '3.12'",
+    "tasklogger>=1; python_version >= '3.12'",
+    "graphtools>=1.4; python_version >= '3.12'",
+    "decorator>=4.3; python_version >= '3.12'",
+    "geomloss",
+    "torchdiffeq",
+    "torchsde",
+    "POT",
+    "phate",
+]
 matlab = [
     "matlabengine",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"diode.utils" = ["run_slingshot.R"]
 
 [project.scripts]
 diode-run = "diode.runners.run_dataset:main"

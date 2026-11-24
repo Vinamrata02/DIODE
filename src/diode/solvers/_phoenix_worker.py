@@ -137,5 +137,38 @@ def train(code_dir, out_dir):
     }, indent=2))
 
 
+def predict(code_dir, fit_dir, input_path, output_path):
+    sys.path.insert(0, str(code_dir))
+    from odenet import ODENet
+    from torchdiffeq import odeint
+
+    torch.set_num_threads(1)
+    run = json.loads((fit_dir / "run_settings.json").read_text())
+    params = run["model_params"]
+    times = np.loadtxt(fit_dir / "integration_time.csv", delimiter=",", ndmin=1)
+    initial = np.load(input_path)
+    expression_scale = params["scale_expression"]
+    normalization = 1.0
+    if params["normalize_data"]:
+        fitted_input = np.loadtxt(fit_dir / "input.csv", delimiter=",", skiprows=1)[:-1]
+        noise = np.random.RandomState(run["seed"]).normal(0, params["noise"], size=fitted_input.shape)
+        normalization = np.abs(((fitted_input + noise) * expression_scale).astype(np.float32)).max()
+        if not np.isfinite(normalization) or normalization == 0:
+            raise ValueError("Cannot restore PHOENIX units with a zero or nonfinite normalization.")
+    device = torch.device("cpu")
+    model = ODENet(device, initial.size, explicit_time=False, neurons=params["neurons_per_layer"]).float()
+    model.load_state_dict(torch.load(fit_dir / "best_train_model.pt", map_location=device, weights_only=True))
+    model.eval()
+    x0 = torch.as_tensor(initial * expression_scale / normalization, dtype=torch.float32)[None, :]
+    t = torch.as_tensor(times, dtype=torch.float32)
+    with torch.no_grad():
+        fitted = odeint(model, x0, t, method=params["method"])[:, 0].numpy()
+    np.save(output_path, fitted * normalization / expression_scale)
+
+
 if __name__ == "__main__":
-    train(Path(sys.argv[1]), Path(sys.argv[2]))
+    args = [Path(arg) for arg in sys.argv[1:]]
+    if len(args) == 2:
+        train(*args)
+    else:
+        predict(*args)

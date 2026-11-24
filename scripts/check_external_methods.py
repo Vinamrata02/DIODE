@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Preflight checks for optional external benchmark methods."""
+"""Preflight checks for optional benchmark methods and evaluation dependencies."""
 
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def r_subprocess_env():
     return env
 
 
-def r_package_exists(package_name):
-    rscript = command_exists("Rscript")
+def r_package_exists(package_name, *, rscript=None, env=None):
+    rscript = rscript or command_exists("Rscript")
     if not rscript:
         return False, "Rscript is not on PATH"
     r_code = (
@@ -51,7 +51,7 @@ def r_package_exists(package_name):
         [rscript, "-e", r_code],
         capture_output=True,
         text=True,
-        env=r_subprocess_env(),
+        env=r_subprocess_env() if env is None else env,
     )
     if result.returncode == 0:
         return True, f"R package {package_name} is available"
@@ -121,6 +121,47 @@ def combine_checks(checks):
     return "ok", "; ".join(details)
 
 
+def check_repo_r_package(package_name, library_name=None):
+    library = REPO_ROOT / ".r-lib" / (library_name or package_name.lower())
+    rscript = os.environ.get("DIODE_RSCRIPT")
+    if not rscript:
+        for path in (library / "rscript-path", REPO_ROOT / ".r-lib" / "alra" / "rscript-path"):
+            if path.is_file():
+                saved = path.read_text().strip()
+                if Path(saved).is_file() and os.access(saved, os.X_OK):
+                    rscript = saved
+                    break
+    if rscript and not command_exists(rscript):
+        return False, f"Rscript is unavailable at {rscript}"
+    env = r_subprocess_env()
+    if library.is_dir():
+        env["R_LIBS"] = os.pathsep.join(filter(None, (str(library), env.get("R_LIBS"))))
+    return r_package_exists(package_name, rscript=rscript, env=env)
+
+
+def imputation_rows(external):
+    scnode = Path(os.environ.get("DIODE_SCNODE_ROOT", external / "scNODE")).expanduser()
+    mioflow = Path(os.environ.get("DIODE_MIOFLOW_ROOT", external / "MIOFlow")).expanduser()
+
+    return [
+        ("scNODE", *combine_checks([
+            check_paths(scnode / "optim" / "running.py"),
+            check_python_packages("torch", "scanpy", "natsort", "geomloss", "torchdiffeq"),
+        ])),
+        ("MIOFlow", *combine_checks([
+            check_paths(mioflow / "mioflow" / "mioflow.py"),
+            check_python_packages("torch", "anndata", "torchdiffeq", "torchsde", "ot", "phate"),
+        ])),
+        ("MAGIC", *combine_checks([
+            check_python_packages("scanpy", "magic", "scprep", "graphtools", "tasklogger"),
+        ])),
+        ("ALRA", *combine_checks([
+            check_paths(external / "ALRA" / "run_alra.R"),
+            check_repo_r_package("ALRA"),
+        ])),
+    ]
+
+
 def method_rows():
     external = REPO_ROOT / "external"
     rows = []
@@ -146,8 +187,7 @@ def method_rows():
         "scode",
         *combine_checks([
             check_paths(external / "SCODE" / "SCODE.R"),
-            rscript_check,
-            check_r_packages("MASS"),
+            check_repo_r_package("MASS", "scode"),
         ]),
     ))
 
@@ -244,11 +284,17 @@ def method_rows():
         ]),
     ))
 
+    rows.extend(imputation_rows(external))
+    rows.append(("Fig. 7 POS (Slingshot)", *combine_checks([
+        check_paths(REPO_ROOT / "src/diode/utils/run_slingshot.R"),
+        check_repo_r_package("slingshot"),
+        check_repo_r_package("DelayedMatrixStats", "slingshot"),
+    ])))
     return rows
 
 
 def print_table(rows):
-    headers = ("method", "status", "message")
+    headers = ("check", "status", "message")
     widths = [
         max(len(headers[index]), *(len(str(row[index])) for row in rows))
         for index in range(len(headers))
