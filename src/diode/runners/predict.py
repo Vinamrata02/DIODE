@@ -11,6 +11,7 @@ from diode.utils.io import (
     load_config,
     load_ordered_expression_dataset,
     optional_reference_dir,
+    resolve_config_repo_root,
     resolve_path,
 )
 
@@ -18,8 +19,6 @@ PREDICTION_SOLVERS = {"diode": "DIODE", "scode": "SCODE", "phoenix": "PHOENIX"}
 
 
 def predict_fitted_expression(fit_datasets, genes):
-    from diode.experiment import DIODEBenchmark
-
     genes = [genes] if isinstance(genes, str) else list(dict.fromkeys(genes))
     if not genes:
         raise ValueError("Provide at least one gene for prediction.")
@@ -36,7 +35,7 @@ def predict_fitted_expression(fit_datasets, genes):
         if not solvers:
             continue
         config = load_config(path)
-        root = DIODEBenchmark._resolve_config_repo_root(config, path)
+        root = resolve_config_repo_root(config, path)
         observed = load_ordered_expression_dataset(
             resolve_path(config["expression"], root),
             resolve_path(config["pseudotime"], root),

@@ -1,8 +1,7 @@
 """Public interface for the DIODE package."""
 
 from diode.experiment import DIODEBenchmark
-from diode.diode import DIODE
-from diode.solvers.diode_lbfgs import LTIExact_Steady
+from diode.solvers.diode_lbfgs import DIODE, LTIExact_Steady
 
 
 def run_dataset(*args, **kwargs):

@@ -29,6 +29,16 @@ def diode_config(config: dict) -> dict:
     return (config.get("solvers") or {}).get("diode") or {}
 
 
+def resolve_config_repo_root(config, config_path):
+    """Resolve the base directory for relative dataset config paths."""
+    config_path = Path(config_path).resolve()
+    if config.get("repo_root"):
+        return Path(config["repo_root"]).expanduser().resolve()
+    if config_path.parent.name == "configs":
+        return config_path.parents[1]
+    return Path.cwd().resolve()
+
+
 def resolve_path(path, base_dir=None) -> Path:
     """Resolve a path relative to the repository root or a supplied base."""
     path = Path(path)

@@ -11,7 +11,7 @@ import numpy as np
 
 from diode import DIODEBenchmark
 from diode.experiment import SolverUnavailableError
-from diode.solvers.diode_lbfgs import impute_diode
+from diode.solvers import diode_lbfgs
 from diode.utils.evaluations import (
     minmax_lower_is_better_score,
     ordered_fragmentation_k1,
@@ -34,7 +34,7 @@ class ImputationTests(unittest.TestCase):
         mask[tied[1], 1] = True
         observed[tied[1], 1] = 0
         ode = np.full_like(observed, 99)
-        result = impute_diode(observed, mask, times, ode)
+        result = diode_lbfgs.impute_diode(observed, mask, times, ode)
         self.assertEqual(result[5, 0], 3)
         self.assertEqual(result[6, 0], 99)
         self.assertEqual(result[tied[1], 1], 99)
@@ -140,8 +140,8 @@ class ImputationTests(unittest.TestCase):
             with (
                 self.subTest(masking=masking),
                 patch.object(runner, "_imputation_baselines", return_value={"magic": baseline}),
-                patch.object(runner, "_fit_imputation_trajectory", side_effect=fit) as fit_call,
-                patch.object(runner, "impute_diode") as interpolate,
+                patch.object(diode_lbfgs, "_fit_imputation_trajectory", side_effect=fit) as fit_call,
+                patch.object(diode_lbfgs, "impute_diode") as interpolate,
                 patch.object(runner, "ordered_fragmentation_k1", side_effect=[0.25, 0.75]),
                 patch.object(runner, "_run_imputation") as masked_runner,
                 patch("diode.utils.slingshot.resolve_slingshot_runtime"),

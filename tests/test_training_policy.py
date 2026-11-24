@@ -1,7 +1,6 @@
 """Verify smoothed baseline inputs and structural DIODE diagonal masking."""
 
 import contextlib
-import importlib
 import io
 import tempfile
 import unittest
@@ -14,10 +13,10 @@ import yaml
 
 from diode import DIODE, DIODEBenchmark
 from diode.runners.run_dataset import run_dataset
+from diode.solvers import diode_lbfgs
 
 
 ROOT = Path(__file__).resolve().parents[1]
-runner = importlib.import_module("diode.runners.run_dataset")
 
 
 def write_fixture(root):
@@ -99,7 +98,7 @@ class TrainingPolicyTests(unittest.TestCase):
             path = root / "configs/tiny.yaml"
             path.write_text(yaml.safe_dump(config))
             masks = []
-            original = runner.train_lti_lbfgs_with_validation
+            original = diode_lbfgs.train_lti_lbfgs_with_validation
             def capture(model, *args, **kwargs):
                 self.assertEqual(kwargs["optimizer_tolerance_change"], 1e-4)
                 self.assertEqual(kwargs["stop_tolerance_change"], 1e-4)
@@ -111,7 +110,7 @@ class TrainingPolicyTests(unittest.TestCase):
                 result = original(model, *args, **kwargs)
                 np.testing.assert_array_equal(np.diag(model.A_eff.detach().cpu()), np.zeros(3))
                 return result
-            with patch.object(runner, "train_lti_lbfgs_with_validation", side_effect=capture), \
+            with patch.object(diode_lbfgs, "train_lti_lbfgs_with_validation", side_effect=capture), \
                  contextlib.redirect_stdout(io.StringIO()):
                 result = run_dataset(path)
             self.assertEqual(len(masks), 3)  # Two CV folds and one final fit.
@@ -165,7 +164,7 @@ class TrainingPolicyTests(unittest.TestCase):
                     np.testing.assert_array_equal(np.diag(mask.cpu().numpy()),
                                                   np.full(3, expected_diagonal))
                     raise RuntimeError("verified initialization mask")
-                with patch.object(runner, "_new_model", side_effect=capture), \
+                with patch.object(diode_lbfgs, "_new_model", side_effect=capture), \
                      contextlib.redirect_stdout(io.StringIO()), \
                      self.assertRaisesRegex(RuntimeError, "verified initialization mask"):
                     run_dataset(path)

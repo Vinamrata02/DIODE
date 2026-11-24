@@ -14,7 +14,13 @@ import torch
 import yaml
 
 from diode.utils.evaluations import aupr_from_matrices, auroc_from_matrices, f1_direction_from_matrices
-from diode.utils.io import load_config, load_ordered_expression_dataset, resolve_path, save_model_outputs
+from diode.utils.io import (
+    load_config,
+    load_ordered_expression_dataset,
+    resolve_config_repo_root,
+    resolve_path,
+    save_model_outputs,
+)
 
 try:
     from tqdm.notebook import IProgress, tqdm as notebook_tqdm
@@ -285,7 +291,7 @@ class DIODEBenchmark:
     def _run_solver(self, dataset, solver, *, config_path=None):
         config_path = self.config_path(dataset) if config_path is None else config_path
         if solver == "diode":
-            from diode.runners.run_dataset import _tune_diode
+            from diode.solvers.diode_lbfgs import _tune_diode
 
             with contextlib.redirect_stdout(io.StringIO()):
                 result = _tune_diode(config_path)
@@ -303,7 +309,7 @@ class DIODEBenchmark:
         start_time = time.perf_counter()
         config_path = self.config_path(dataset) if config_path is None else config_path
         config = load_config(config_path)
-        root = self._resolve_config_repo_root(config, config_path)
+        root = resolve_config_repo_root(config, config_path)
         solver_cfg = self._solver_config(config, solver)
         expression_path = solver_cfg.get("expression", config.get("baseline_expression", config["expression"]))
         data = load_ordered_expression_dataset(
@@ -552,15 +558,6 @@ class DIODEBenchmark:
             miniters=1,
             position=1,
         )
-
-    @staticmethod
-    def _resolve_config_repo_root(config, config_path):
-        config_path = Path(config_path).resolve()
-        if config.get("repo_root"):
-            return Path(config["repo_root"]).expanduser().resolve()
-        if config_path.parent.name == "configs":
-            return config_path.parents[1]
-        return Path.cwd().resolve()
 
     @staticmethod
     def _resolve_repo_root(repo_root):
