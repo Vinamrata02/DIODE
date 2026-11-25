@@ -1,15 +1,15 @@
 dataset: data1
-data_dir: data/data1
-reference_network_dir: data/data1
+data_dir: data/data1_mouse_esc_pre
+reference_network_dir: data/data1_mouse_esc_pre
 output_dir: outputs/data1
-expression: data/data1/datamatrix_ordered_smooth_5.txt
-baseline_expression: data/data1/datamatrix_ordered_smooth_5.txt
-pseudotime: data/data1/pseudotime_ordered.txt
-genes: data/data1/tf.txt
+expression: data/data1_mouse_esc_pre/datamatrix_ordered_smooth_5.txt
+baseline_expression: data/data1_mouse_esc_pre/datamatrix_ordered_smooth_5.txt
+pseudotime: data/data1_mouse_esc_pre/pseudotime_ordered.txt
+genes: data/data1_mouse_esc_pre/tf.txt
 
 trajectory:
-  expression: data/data1/datamatrix.txt
-  reference_time: data/data1/fig7_capture_time.txt
+  expression: data/data1_mouse_esc_pre/datamatrix.txt
+  reference_time: data/data1_mouse_esc_pre/fig7_capture_time.txt
 
 solvers:
   diode:
@@ -57,7 +57,7 @@ solvers:
   phoenix:
     phoenix_root: external/PHOENIX
     # Match the PHOENIX notebooks: smoothed expression, no prior network.
-    expression: data/data1/datamatrix_ordered_smooth_5.txt
+    expression: data/data1_mouse_esc_pre/datamatrix_ordered_smooth_5.txt
     time_policy: rank_if_tied
     model_params:
       method: dopri5

@@ -50,6 +50,35 @@ class DIODE:
         self.metrics_ = self.result_["metrics"]
         return self.result_
 
+    def impute(self, mask=None):
+        """Return imputed expression in the input's genes-by-cells order.
+
+        A Boolean mask selects entries to impute. With no mask, select
+        entries whose absolute ODE residual exceeds the tuned Huber threshold.
+        """
+        config = load_config(self.config_path)
+        root = resolve_config_repo_root(config, self.config_path)
+        data = load_ordered_expression_dataset(
+            resolve_path(config["expression"], root),
+            resolve_path(config["pseudotime"], root),
+            resolve_path(config["genes"], root),
+            dtype=_observation_dtype(config),
+            sort_kind=None,
+        )
+        observed = data["expression_cells_by_genes"]
+        times = data["pseudotime"]
+        if not np.isfinite(observed).all() or not np.isfinite(times).all():
+            raise ValueError("Imputation requires finite expression and pseudotime values.")
+
+        if mask is not None:
+            mask = np.asarray(mask)
+            if mask.dtype != np.bool_ or mask.shape != observed.T.shape:
+                raise ValueError("mask must be a Boolean matrix with the same genes-by-cells shape as expression.")
+            mask = mask.T
+
+        order = np.argsort(times, kind=diode_config(config).get("sort_kind", "stable"))
+        return _impute_with_diode(self.config_path, data, observed, mask, order).T
+
     def evaluate(self, A_true=None, mask=None):
         """Evaluate saved perturbation scores using a supplied or configured reference."""
         reference_dir = None
@@ -1136,11 +1165,17 @@ def _observation_dtype(config):
 
 
 def _impute_with_diode(config_path, data, observed, mask, order):
-    predictions = _fit_imputation_trajectory(config_path, data, observed, order)
+    if mask is None:
+        predictions, huber_delta = _fit_imputation_trajectory(
+            config_path, data, observed, order, return_huber_delta=True,
+        )
+        mask = np.abs(observed - predictions) > huber_delta
+    else:
+        predictions = _fit_imputation_trajectory(config_path, data, observed, order)
     return impute_diode(observed, mask, data["pseudotime"], predictions)
 
 
-def _fit_imputation_trajectory(config_path, data, observed, order):
+def _fit_imputation_trajectory(config_path, data, observed, order, *, return_huber_delta=False):
     times = data["pseudotime"]
     dtype = data["Y_obs"].dtype
     y_obs = torch.tensor(observed[None, order, :], dtype=dtype)
@@ -1153,12 +1188,16 @@ def _fit_imputation_trajectory(config_path, data, observed, order):
     }
     with TemporaryDirectory(prefix="diode-imputation-") as work_dir:
         with open(Path(work_dir) / "training.log", "w") as log, contextlib.redirect_stdout(log):
-            sorted_predictions = _tune_diode(config_path, data=fit_data, fit_dir=Path(work_dir))
+            sorted_predictions, huber_delta = _tune_diode(
+                config_path, data=fit_data, fit_dir=Path(work_dir),
+            )
     if not np.isfinite(sorted_predictions).all():
         raise ValueError(f"DIODE returned nonfinite trajectory predictions for {config_path}.")
     # The fit uses sorted pseudotime. Score in the original file order.
     ode_predictions = np.empty_like(sorted_predictions)
     ode_predictions[order] = sorted_predictions
+    if return_huber_delta:
+        return ode_predictions, huber_delta
     return ode_predictions
 
 
@@ -1424,7 +1463,7 @@ def _tune_diode(config_path, *, data=None, fit_dir=None):
         Y_pred = final_model(x0, t_span).detach().cpu().numpy()
 
     if fit_dir is not None:
-        return Y_pred[0]
+        return Y_pred[0], selected_huber_delta
 
     save_model_outputs(
         output_dir,

@@ -1,15 +1,15 @@
 dataset: data4_trophectoderm
-data_dir: data/data4_trophectoderm
-reference_network_dir: data/data4_trophectoderm
+data_dir: data/05_data4_trophectoderm
+reference_network_dir: data/05_data4_trophectoderm
 output_dir: outputs/data4_trophectoderm
-expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
-baseline_expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_raw_100.txt
-pseudotime: data/data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
-genes: data/data4_trophectoderm/trophectoderm_gene_names_100.txt
+expression: data/05_data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
+baseline_expression: data/05_data4_trophectoderm/datamatrix_ordered_trophectoderm_raw_100.txt
+pseudotime: data/05_data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
+genes: data/05_data4_trophectoderm/trophectoderm_gene_names_100.txt
 
 trajectory:
-  expression: data/data4_trophectoderm/fig7_raw_expression.txt
-  reference_time: data/data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
+  expression: data/05_data4_trophectoderm/fig7_raw_expression.txt
+  reference_time: data/05_data4_trophectoderm/pseudotime_ordered_trophectoderm.txt
 
 solvers:
   diode:
@@ -47,7 +47,7 @@ solvers:
   phoenix:
     phoenix_root: external/PHOENIX
     # Match the PHOENIX notebooks: smoothed expression, no prior network.
-    expression: data/data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
+    expression: data/05_data4_trophectoderm/datamatrix_ordered_trophectoderm_normalized_smooth_5_100.txt
     time_policy: rank_if_tied
     model_params:
       method: dopri5

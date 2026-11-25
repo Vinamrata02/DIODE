@@ -1,16 +1,16 @@
 dataset: data3
-data_dir: data/data3
-reference_network_dir: data/data3
+data_dir: data/data3_human_esc_de
+reference_network_dir: data/data3_human_esc_de
 output_dir: outputs/data3
-expression: data/data3/datamatrix_ordered_smooth_5.txt
-imputation_expression: data/data3/datamatrix_ordered_smooth_10.txt
-baseline_expression: data/data3/datamatrix.txt
-pseudotime: data/data3/pseudotime_ordered.txt
-genes: data/data3/tf.txt
+expression: data/data3_human_esc_de/datamatrix_ordered_smooth_5.txt
+imputation_expression: data/data3_human_esc_de/datamatrix_ordered_smooth_10.txt
+baseline_expression: data/data3_human_esc_de/datamatrix.txt
+pseudotime: data/data3_human_esc_de/pseudotime_ordered.txt
+genes: data/data3_human_esc_de/tf.txt
 
 trajectory:
-  expression: data/data3/datamatrix.txt
-  reference_time: data/data3/fig7_capture_time.txt
+  expression: data/data3_human_esc_de/datamatrix.txt
+  reference_time: data/data3_human_esc_de/fig7_capture_time.txt
 
 solvers:
   diode:
@@ -44,7 +44,7 @@ solvers:
   phoenix:
     phoenix_root: external/PHOENIX
     # Match the PHOENIX notebooks: smoothed expression, no prior network.
-    expression: data/data3/datamatrix_ordered_smooth_5.txt
+    expression: data/data3_human_esc_de/datamatrix_ordered_smooth_5.txt
     time_policy: rank_if_tied
     model_params:
       method: dopri5

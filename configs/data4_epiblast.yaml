@@ -1,16 +1,16 @@
 dataset: data4_epiblast
-data_dir: data/data4_epiblast
-reference_network_dir: data/data4_epiblast
+data_dir: data/04_data4_epiblast
+reference_network_dir: data/04_data4_epiblast
 output_dir: outputs/data4_epiblast
-expression: data/data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
-baseline_expression: data/data4_epiblast/datamatrix_ordered_epiblast_raw_100.txt
-pseudotime: data/data4_epiblast/pseudotime_ordered_epiblast.txt
-genes: data/data4_epiblast/epiblast_gene_names_100.txt
+expression: data/04_data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
+baseline_expression: data/04_data4_epiblast/datamatrix_ordered_epiblast_raw_100.txt
+pseudotime: data/04_data4_epiblast/pseudotime_ordered_epiblast.txt
+genes: data/04_data4_epiblast/epiblast_gene_names_100.txt
 
 trajectory:
-  expression: data/data4_epiblast/datamatrix_ordered_epiblast_raw_100.txt
-  reference_time: data/data4_epiblast/pseudotime_ordered_epiblast.txt
-  reference_expression: data/data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
+  expression: data/04_data4_epiblast/datamatrix_ordered_epiblast_raw_100.txt
+  reference_time: data/04_data4_epiblast/pseudotime_ordered_epiblast.txt
+  reference_expression: data/04_data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
 
 solvers:
   diode:
@@ -47,7 +47,7 @@ solvers:
   phoenix:
     phoenix_root: external/PHOENIX
     # Match the PHOENIX notebooks: smoothed expression, no prior network.
-    expression: data/data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
+    expression: data/04_data4_epiblast/datamatrix_ordered_epiblast_normalized_smooth_5_100.txt
     time_policy: rank_if_tied
     model_params:
       method: dopri5
