@@ -243,7 +243,7 @@ Activate the environment used by your notebook before running the same
 setup and checks as the AUROC methods.
 
 ```bash
-conda activate ode-clone
+conda activate diode
 bash scripts/setup_external_methods.sh
 python scripts/check_external_methods.py
 ```
